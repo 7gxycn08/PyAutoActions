@@ -7,10 +7,7 @@
 - Runs In tray.
 
 
-
 ![pyautoactions](https://github.com/7gxycn08/PyAutoActions/assets/121936658/3db2657d-f30a-4c25-bb99-30994e897fda)
-
-
 
 
 # Usage:
@@ -19,3 +16,6 @@
 3. To run program at startup use `task scheduler` and run as admin.
 4. Make sure to use `Start in (optional)` and specify PyAutoActions installation folder. 
 
+
+# TODO:
+1. Open to adding extra functionality.
