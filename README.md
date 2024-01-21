@@ -18,4 +18,5 @@
 
 
 # TODO:
-1. Open to adding extra functionality.
+1. Looking forward to adding extra functionality.
+2. Pull requests are welcome.
