@@ -13,8 +13,7 @@
 # Usage:
 1. Add process name.
 2. Run `Game`.
-3. To run program at startup use `task scheduler` and run as admin.
-4. Make sure to use `Start in (optional)` and specify PyAutoActions installation folder. 
+3. To run program at startup right-click tray icon and enable `Run on System Boot`.
 
 
 # TODO:
