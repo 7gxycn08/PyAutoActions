@@ -5,7 +5,7 @@
 
 
 - ex: (When you start a Game HDR will turn on and when you close It will turn off).
-- Processes can be added via filedialog or manually by process name.
+- Processes can be added via filedialog or manually by process name (case-Insensitive).
 - Very low cpu usage.
 - Runs In tray.
 
