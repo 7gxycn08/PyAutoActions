@@ -1,7 +1,10 @@
 # PyAutoActions
 
 
-- HDR will be enabled and automatically for added processes.
+- HDR will be enabled and disabled automatically for added processes
+
+
+- ex: (When you start a Game HDR will turn on and when you close It will run off).
 - Processes can be added via filedialog or manually by process name.
 - Very low cpu usage.
 - Runs In tray.
@@ -14,7 +17,7 @@
 1. Add process name.
 2. Run `Game`.
 3. To run program at startup right-click tray icon and enable `Run on System Boot`.
-
+4. To enable `AutoHDR` for unsupported games you can use `ForceAutoHDR GUI` https://github.com/7gxycn08/ForceAutoHDR
 
 # TODO:
 1. Looking forward to adding extra functionality.
