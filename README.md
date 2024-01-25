@@ -4,7 +4,7 @@
 - HDR will be enabled and disabled automatically for added processes.
 
 
-- ex: (When you start a Game HDR will turn on and when you close It will turn off).
+- ex: `When you start a Game HDR will turn on and when you close It will turn off.`
 - Processes can be added via filedialog or manually by process name (case-Insensitive).
 - Very low cpu usage.
 - Runs In tray.
