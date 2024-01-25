@@ -17,7 +17,7 @@
 1. Add process name.
 2. Run `Game`.
 3. To run `PyAutoActions` at startup right-click tray icon and enable `Run on System Boot`.
-4. To enable `AutoHDR` for unsupported games you can use `ForceAutoHDR GUI` https://github.com/7gxycn08/ForceAutoHDR
+4. To enable `AutoHDR` for unsupported games you can use [ForceAutoHDR](GUI https://github.com/7gxycn08/ForceAutoHDR)
 
 # TODO:
 1. Looking forward to adding extra functionality.
