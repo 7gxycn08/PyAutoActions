@@ -1,7 +1,7 @@
 # PyAutoActions
 
 
-- HDR will be enabled and disabled automatically for added processes
+- HDR will be enabled and disabled automatically for added processes.
 
 
 - ex: (When you start a Game HDR will turn on and when you close It will run off).
