@@ -10,7 +10,8 @@
 - Runs In tray.
 
 
-![pyautoactions](https://github.com/7gxycn08/PyAutoActions/assets/121936658/3db2657d-f30a-4c25-bb99-30994e897fda)
+
+![pyautoactions](https://github.com/7gxycn08/PyAutoActions/assets/121936658/4e8e69aa-2cd9-4afc-a186-d6cdd5e6bc97)
 
 
 # Usage:
