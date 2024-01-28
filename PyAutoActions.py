@@ -1,20 +1,29 @@
 import time
 import threading
-import tkinter.messagebox
 import subprocess
-from PyQt5.QtWidgets import (QMenu, QSystemTrayIcon,QApplication, QVBoxLayout, QListWidget, QPushButton,
-                             QLineEdit,QFileDialog,QMainWindow,QWidget,QMessageBox,QAction)
-from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import QCoreApplication,QSettings
+from PyQt6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget, QPushButton,
+                             QLineEdit, QFileDialog, QMainWindow, QWidget, QMessageBox)
+from PyQt6.QtGui import QIcon, QAction
+from PyQt6.QtCore import QCoreApplication, QSettings, pyqtSignal, Qt
 import sys
 import os
 import configparser
 import ctypes
 import win32com.client
 
-class ProcessMonitor(QMainWindow):
+class ProcessMonitor(QWidget):
+    finished = pyqtSignal()
     def __init__(self, process_list, toggle_state):
         super().__init__()
+        self.global_hdr_state_status = None
+        self.is_process_running_status = None
+        self.process_check_status = None
+        self.exception_msg = None
+        self.finished.connect(self.on_finished_show_msg, Qt.ConnectionType.QueuedConnection)
+        self.error_thread = None
+        self.process_thread = None
+        self.enable_hdr_thread = None
+        self.disable_hdr_thread = None
         self.process_list = process_list
         self.toggle_state = toggle_state
         self.found_process = False
@@ -25,12 +34,41 @@ class ProcessMonitor(QMainWindow):
         self.SetGlobalHDRState.restype = None
         self.SetGlobalHDRState.__cdecl__ = True
 
+    def on_finished_show_msg(self):
+        warning_message_box = QMessageBox()
+        warning_message_box.setWindowTitle("PyAutoActions Error")
+        warning_message_box.setWindowIcon(QIcon("Resources/main.ico"))
+        warning_message_box.setFixedSize(400, 200)
+        warning_message_box.setIcon(QMessageBox.Icon.Critical)
+        warning_message_box.setText(f"{self.exception_msg}")
+        warning_message_box.exec()
+
+    def process_check(self):
+        try:
+            for process in self.process_list:
+                if self.is_process_running(process):
+                    if not self.toggle_state:
+                        self.toggle_state = True
+                        self.found_process = True
+                        self.main_process = process
+                        self.enable_hdr_thread = threading.Thread(
+                            target=self.call_set_global_hdr_state, daemon=True)
+                        self.enable_hdr_thread.start()
+                        self.enable_hdr_thread.join()
+                        break
+        except Exception as e:
+            self.process_check_status = True
+            self.exception_msg = f"process_check: {e}"
+            self.finished.emit()
+            return
+
     def call_set_global_hdr_state(self):
         try:
             self.SetGlobalHDRState(bool(self.toggle_state))
         except Exception as e:
-            tkinter.messagebox.showerror(title="Error", message=f"call_set_global_hdr_state: {e}")
-
+            self.global_hdr_state_status = True
+            self.exception_msg = f"call_set_global_hdr_state: {e}"
+            self.finished.emit()
     def is_process_running(self,process_name):
         PROCESS_QUERY_INFORMATION = 0x0400
         PROCESS_VM_READ = 0x0010
@@ -42,7 +80,8 @@ class ProcessMonitor(QMainWindow):
             process_count = cb.value // ctypes.sizeof(ctypes.c_ulong)
             for i in range(process_count):
                 process_id = processes[i]
-                process_handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, False,
+                process_handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+                                                                    False,
                                                                     process_id)
 
                 if process_handle:
@@ -56,34 +95,40 @@ class ProcessMonitor(QMainWindow):
             return False
 
         except Exception as e:
-            tkinter.messagebox.showerror(title="Error", message=f"is_process_running: {e}")
-
-    def process_thread(self):
-        for process in self.process_list:
-            if self.is_process_running(process):
-                if not self.toggle_state:
-                    self.toggle_state = True
-                    self.found_process = True
-                    self.main_process = process
-                    threading.Thread(
-                        target=self.call_set_global_hdr_state, daemon=True).start()
-                    break
-
+            self.is_process_running_status = True
+            self.exception_msg = f"is_process_running {e}"
+            self.finished.emit()
     def process_monitor(self):
         while True:
-            if not self.found_process:
-                threading.Thread(target=lambda: self.process_thread(), daemon=True).start()
-            else:
-                if self.toggle_state and not self.is_process_running(self.main_process):
-                    self.toggle_state = False
-                    self.found_process = False
-                    threading.Thread(
-                        target=self.call_set_global_hdr_state, daemon=True).start()
-            time.sleep(5)
+            try:
+                if self.process_check_status == True:
+                    break
+                if self.is_process_running_status == True:
+                    break
+                if self.global_hdr_state_status == True:
+                    break
+                if not self.found_process:
+                    self.process_thread = threading.Thread(target=self.process_check, daemon=True)
+                    self.process_thread.start()
+                else:
+                    if self.toggle_state and not self.is_process_running(self.main_process):
+                        self.toggle_state = False
+                        self.found_process = False
+                        self.disable_hdr_thread = threading.Thread(
+                            target=self.call_set_global_hdr_state, daemon=True)
+                        self.disable_hdr_thread.start()
 
+                time.sleep(5)
+            except RuntimeError:
+                break
+            except Exception as e:
+                self.exception_msg = f"process_monitor: {e}"
+                self.finished.emit()
+                break
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.monitor_thread = None
         self.boot_status = None
         self.toggle_state = False
         self.script_path = f"{os.path.abspath(sys.argv[0])}"
@@ -93,14 +138,15 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['MyList']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.warning_message_box = QMessageBox()
-        self.warning_message_box.setIcon(QMessageBox.Warning)
-        self.warning_message_box.setWindowTitle("Error")
+        self.warning_message_box = QMessageBox(self)
+        self.warning_message_box.setIcon(QMessageBox.Icon.Warning)
+        self.warning_message_box.setWindowTitle("PyAutoActions Error")
+        self.warning_message_box.setWindowIcon(QIcon("Resources/main.ico"))
         self.warning_message_box.setFixedSize(400, 200)
         self.settings = QSettings("7gxycn08@Github", "PyAutoActions")
-        self.setWindowTitle("PyAutoActions v1.0.0.1")
+        self.setWindowTitle("PyAutoActions v1.0.0.2")
         self.setWindowIcon(QIcon(os.path.abspath("Resources/main.ico")))
-        self.setGeometry(100, 100, 1000, 600)
+        self.setGeometry(100, 100, 600, 400)
         self.central_widget = QWidget(self)
         self.list_widget = QListWidget(self.central_widget)
         self.entry_line_edit = QLineEdit(self.central_widget)
@@ -123,7 +169,6 @@ class MainWindow(QMainWindow):
         self.tray_icon.setToolTip("PyAutoActions")
         self.tray_icon.setIcon(QIcon(os.path.abspath("Resources/main.ico")))
         self.tray_icon.activated.connect(self.tray_icon_activated)
-        self.show()
         self.load_processes_from_config()
 
         self.menu = QMenu()
@@ -147,10 +192,16 @@ class MainWindow(QMainWindow):
         self.tray_icon.setContextMenu(self.menu)
         if start_hidden_checked:
             self.hide()
+        else:
+            self.show()
         self.tray_icon.show()
         self.run_initially_at_start()
-        monitor = ProcessMonitor(self.process_list,self.toggle_state)
-        threading.Thread(target=lambda: monitor.process_monitor(), daemon=True).start()
+        try:
+            self.monitor = ProcessMonitor(self.process_list, self.toggle_state)
+            self.monitor_thread = threading.Thread(target=self.monitor.process_monitor)
+            self.monitor_thread.start()
+        except:
+            self.warning_message_box.warning("PyAutoActions Error", "Fatal Error ProcessMonitor")
 
     def run_on_boot(self):
         try:
@@ -165,7 +216,8 @@ class MainWindow(QMainWindow):
                 self.run_on_boot_action.setChecked(True)
                 self.boot_status = True
         except Exception as e:
-            tkinter.messagebox.showerror(title="Error", message=f"run_on_boot: {e}")
+            self.warning_message_box.warning(self, "PyAutoActions Error", f"run_on_boot: {e}",
+                                             QMessageBox.StandardButton.Ok)
 
     def run_initially_at_start(self):
         try:
@@ -176,7 +228,8 @@ class MainWindow(QMainWindow):
                 self.run_on_boot_action.setChecked(False)
                 self.boot_status = False
         except Exception as e:
-            tkinter.messagebox.showerror(title="Error", message=f"run_Initially: {e}")
+            self.warning_message_box.warning(self, "PyAutoActions Error", f"run_Initially: {e}",
+                                             QMessageBox.StandardButton.Ok)
 
     def remove_task(self):
         try:
@@ -192,7 +245,8 @@ class MainWindow(QMainWindow):
             self.boot_status = False
 
         except Exception as e:
-            self.warning_message_box.warning(None, "Error", f"remove_task: {e}", QMessageBox.Ok)
+            self.warning_message_box.warning(self, "PyAutoActions Error", f"remove_task: {e}",
+                                             QMessageBox.StandardButton.Ok)
 
     def toggle_start_hidden(self):
         checked = self.start_hidden_action.isChecked()
@@ -211,7 +265,8 @@ class MainWindow(QMainWindow):
             except:
                 return False
         except Exception as e:
-            self.warning_message_box.warning(None, "Error", f"is_task_installed: {e}", QMessageBox.Ok)
+            self.warning_message_box.warning(self, "PyAutoActions Error", f"is_task_installed: {e}",
+                                             QMessageBox.StandardButton.Ok)
 
     def register_as_task(self):
         try:
@@ -248,7 +303,8 @@ class MainWindow(QMainWindow):
             self.run_on_boot_action.setChecked(True)
             self.boot_status = True
         except Exception as e:
-            self.warning_message_box.warning(None, "Error", f"register_as_task: {e}", QMessageBox.Ok)
+            self.warning_message_box.warning(self, "PyAutoActions Error", f"register_as_task: {e}",
+                                             QMessageBox.StandardButton.Ok)
 
     def about_page(self):
         subprocess.Popen("start https://github.com/7gxycn08/PyAutoActions",
@@ -258,7 +314,7 @@ class MainWindow(QMainWindow):
         event.ignore()
         self.hide()
     def tray_icon_activated(self, reason):
-        if reason == QSystemTrayIcon.DoubleClick:
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
             self.show_window()
     def close_tray_icon(self):
         QCoreApplication.quit()
@@ -271,11 +327,12 @@ class MainWindow(QMainWindow):
         try:
             entry_text = self.entry_line_edit.text()
             if entry_text in self.process_list:
-                self.warning_message_box.warning(None, "Error", f"Process {entry_text} already exists in the list.",
-                                                 QMessageBox.Ok)
+                self.warning_message_box.warning(self, "PyAutoActions Error",
+                                                 f"Process {entry_text} already exists in the list.",
+                                                 QMessageBox.StandardButton.Ok)
             elif ".exe" not in entry_text:
-                self.warning_message_box.warning(None, "Error", f"Manual Entries Require Extensions *.exe",
-                                                 QMessageBox.Ok)
+                self.warning_message_box.warning(self, "PyAutoActions Error", f"Manual Entries Require Extensions *.exe",
+                                                 QMessageBox.StandardButton.Ok)
             else:
                 self.process_list.append(entry_text)
                 self.save_config()
@@ -284,7 +341,8 @@ class MainWindow(QMainWindow):
                     self.list_widget.insertItem(0, entry_text)
                     self.entry_line_edit.clear()
         except Exception as e:
-            self.warning_message_box.warning(None, "Error", f"add_entry: {e}", QMessageBox.Ok)
+            self.warning_message_box.warning(self, "PyAutoActions Error", f"add_entry: {e}",
+                                             QMessageBox.StandardButton.Ok)
 
     def remove_selected_entry(self):
         try:
@@ -298,11 +356,13 @@ class MainWindow(QMainWindow):
                 self.list_widget.takeItem(self.list_widget.row(selected_item))
                 self.update_classes_variables()
             else:
-                self.warning_message_box.warning(None, "Error", "Nothing to remove.", QMessageBox.Ok)
+                self.warning_message_box.warning(self, "PyAutoActions Error", "Nothing to remove.",
+                                                 QMessageBox.StandardButton.Ok)
         except ValueError as ve:
-            self.show_error_message(f"Error: {ve}")
+            self.warning_message_box.warning(self, f"PyAutoActions Error:", {ve}, QMessageBox.StandardButton.Ok)
         except Exception as e:
-            self.warning_message_box.warning(None, "Error", f"Nothing to remove. {e}", QMessageBox.Ok)
+            self.warning_message_box.warning(self, "PyAutoActions Error", f"Nothing to remove. {e}",
+                                             QMessageBox.StandardButton.Ok)
 
     def update_classes_variables(self):
         process_monitor = ProcessMonitor(self.process_list, self.toggle_state)
@@ -317,15 +377,17 @@ class MainWindow(QMainWindow):
                 exe_name = os.path.basename(file_path)
                 if exe_name in self.process_list:
 
-                    self.warning_message_box.warning(None, "Error", f"Process {exe_name} already exists in the list.",
-                                                     QMessageBox.Ok)
+                    self.warning_message_box.warning(self, "PyAutoActions Error",
+                                                     f"Process {exe_name} already exists in the list.",
+                                                     QMessageBox.StandardButton.Ok)
                 else:
                     self.list_widget.insertItem(0, exe_name)
                     self.process_list.append(exe_name)
                     threading.Thread(target=self.save_config, daemon=True).start()
                     self.update_classes_variables()
         except Exception as e:
-            self.warning_message_box.warning(None, "Error", f"add_exe: {e}", QMessageBox.Ok)
+            self.warning_message_box.warning(self, "PyAutoActions Error", f"add_exe: {e}",
+                                             QMessageBox.StandardButton.Ok)
 
     def save_config(self):
         try:
@@ -334,11 +396,10 @@ class MainWindow(QMainWindow):
 
             with open('processlist.ini', 'w') as configfile:
                 self.config.write(configfile)
-                process_monitor = ProcessMonitor(self.process_list,self.toggle_state)
-                process_monitor.toggle_state = self.toggle_state
-                process_monitor.process_list = self.process_list
+                self.update_classes_variables()
         except Exception as e:
-            self.warning_message_box.warning(None, "Error", f"save_config: {e}", QMessageBox.Ok)
+            self.warning_message_box.warning(self, "PyAutoActions Error", f"save_config: {e}",
+                                             QMessageBox.StandardButton.Ok)
 
     def load_processes_from_config(self):
         try:
@@ -350,10 +411,12 @@ class MainWindow(QMainWindow):
                 processes = process_list_str.split(', ')
                 for process in processes:
                     self.list_widget.insertItem(0, process)
+                self.update_classes_variables()
         except Exception as e:
-            self.warning_message_box.warning(None, "Error", f"load_processess_from_config: {e}", QMessageBox.Ok)
+            self.warning_message_box.warning(self, "PyAutoActions Error", f"load_processess_from_config: {e}",
+                                             QMessageBox.StandardButton.Ok)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
