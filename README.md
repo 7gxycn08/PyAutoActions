@@ -11,7 +11,8 @@
 
 
 
-![pyautoactions](https://github.com/7gxycn08/PyAutoActions/assets/121936658/4e8e69aa-2cd9-4afc-a186-d6cdd5e6bc97)
+![pyautoactions](https://github.com/7gxycn08/PyAutoActions/assets/121936658/3b79db52-a129-4901-b044-4d1de5bd70bb)
+
 
 
 # Usage:
