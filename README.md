@@ -4,7 +4,7 @@
 - **HDR will be enabled and disabled automatically for added processes.**
 
 
-- ex: `When you start a Game HDR will turn on and when you close It will turn off.`
+- ex: `When you start a game hdr will turn on and when you close It will turn off.`
 - **Processes can be added via filedialog or manually by process name (case-Insensitive).**
 - **Very low cpu usage runs on 3 threads only.**
 - **Runs In tray.**
@@ -29,6 +29,10 @@
   
   
    **a `game launcher` from `system tray` have been implemented.**
+6. **When using `[ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR)` to force windows auto hdr, system hdr is required to be enabled before game start**
+
+
+  **launching the game from system tray Is required.**
 
 # TODO:
 1. **Looking forward to adding extra functionality.**
