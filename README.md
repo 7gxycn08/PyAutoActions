@@ -29,7 +29,7 @@
   
   
    **a `game launcher` from `system tray` have been implemented.**
-6. **When using `[ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR)` to force windows auto hdr, system hdr is required to be enabled before game start**
+6. **When using [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR) to force windows auto hdr, system hdr is required to be enabled before game start**
 
 
   **launching the game from system tray Is required.**
