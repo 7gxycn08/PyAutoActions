@@ -10,8 +10,9 @@
 - **Runs In tray.**
 
 
+![v1 0 0 3](https://github.com/7gxycn08/PyAutoActions/assets/121936658/07d09a8d-d6a7-4626-ac3f-8bb8a1aaa94e)
 
-![pyautoactions](https://github.com/7gxycn08/PyAutoActions/assets/121936658/3b79db52-a129-4901-b044-4d1de5bd70bb)
+
 
 # v1.0.0.3 New feature:
 - **Added Game Launcher from system tray.**
