@@ -15,7 +15,7 @@
 
 # v1.0.0.3 New feature:
 - **Added Game Launcher from system tray.**
-- **Full list of changes are in [Releases]([https://github.com/7gxycn08/ForceAutoHDR](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.3))**
+- **Full list of changes are in [Releases]([https://github.com/7gxycn08/ForceAutoHDR](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.3)**
 
 # Usage:
 1. **Add process name.**
