@@ -21,7 +21,7 @@
 - **Full list of changes are in [Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.3)**
 
 # Usage:
-1. **Add process name.**
+1. **Add game/application exe path using button.**
 2. **Run `Game` and hdr will automatically be enabled at start and disabled when you close the game.**
 3. **To run `PyAutoActions` at startup right-click tray icon and enable `Run on System Boot`.**
 4. **To enable `AutoHDR` for unsupported games you can use [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR)**
