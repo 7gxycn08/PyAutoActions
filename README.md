@@ -5,7 +5,7 @@
 
 
 - ex: `When you start a game hdr will turn on and when you close It will turn off.`
-- **Processes can be added via filedialog or manually by process name (case-Insensitive).**
+- **Games can be added via filedialog using the button**
 - **Very low cpu usage runs on 3 threads only.**
 - **Runs In tray.**
 - **Can launch games manually from system tray**.
