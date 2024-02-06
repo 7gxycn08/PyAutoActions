@@ -14,7 +14,7 @@
 ![pyautoactions](https://github.com/7gxycn08/PyAutoActions/assets/121936658/3b79db52-a129-4901-b044-4d1de5bd70bb)
 
 # v1.0.0.3 New feature:
-- **Added Game Launcher from system tray.*
+- **Added Game Launcher from system tray.**
 - **Full list of changes are in [Releases]([https://github.com/7gxycn08/ForceAutoHDR](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.3))**
 
 # Usage:
