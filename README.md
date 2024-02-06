@@ -25,7 +25,7 @@
 2. **Run `Game` and hdr will automatically be enabled at start and disabled when you close the game.**
 3. **To run `PyAutoActions` at startup right-click tray icon and enable `Run on System Boot`.**
 4. **To enable `AutoHDR` for unsupported games you can use [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR)**
-5. **To address the issue of games requiring HDR to be enabled `before launch`  a `game launcher` from `system tray` have been implemented.**
+5. **To address the issue of games requiring HDR to be enabled `before launch`<br> a `game launcher` from `system tray` have been implemented.**
 6. **When using [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR) to force windows auto hdr, system hdr is required to be enabled before game start. Launching the game from system tray Is required.**
 
 
