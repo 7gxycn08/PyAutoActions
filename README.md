@@ -22,7 +22,7 @@
 
 # Usage:
 1. **Add process name.**
-2. **Run `Game`.**
+2. **Run `Game` and hdr will automatically be enabled.**
 3. **To run `PyAutoActions` at startup right-click tray icon and enable `Run on System Boot`.**
 4. **To enable `AutoHDR` for unsupported games you can use [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR)**
 5. **To address the issue of games requiring HDR to be enabled `before launch`**
