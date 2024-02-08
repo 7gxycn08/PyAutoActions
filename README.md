@@ -19,7 +19,7 @@
 
 
 # v1.0.0.4 Changes:
-- **Added custom css styling.
+- **Added custom css styling.**
 
 - **Full list of changes are in [Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.4)**
 
