@@ -2,7 +2,7 @@ import time
 import threading
 import subprocess
 from PyQt6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget, QPushButton,
-                             QFileDialog, QMainWindow, QWidget, QMessageBox)
+                             QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout)
 from PyQt6.QtGui import QIcon, QAction, QPixmap, QImage
 from PyQt6.QtCore import QCoreApplication, QSettings, pyqtSignal, Qt, QSize
 import sys
@@ -165,39 +165,60 @@ class MainWindow(QMainWindow):
         self.script_path = f"{os.path.abspath(sys.argv[0])}"
         self.task_name = "PyAutoActions"
         self.config = configparser.ConfigParser()
-        self.config.read('processlist.ini')
+        self.config.read(r'processlist.ini')
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
         self.warning_message_box = QMessageBox(self)
         self.warning_message_box.setIcon(QMessageBox.Icon.Warning)
         self.warning_message_box.setWindowTitle("PyAutoActions Error")
-        self.warning_message_box.setWindowIcon(QIcon("Resources/main.ico"))
+        self.warning_message_box.setWindowIcon(QIcon(r"Resources/main.ico"))
         self.warning_message_box.setFixedSize(400, 200)
 
-        self.setWindowTitle("PyAutoActions v1.0.0.3")
-        self.setWindowIcon(QIcon(os.path.abspath("Resources/main.ico")))
+        self.setWindowTitle("PyAutoActions v1.0.0.4")
+        self.setWindowIcon(QIcon(os.path.abspath(r"Resources/main.ico")))
         self.setGeometry(100, 100, 600, 400)
+
         self.central_widget = QWidget(self)
-        self.list_widget = QListWidget(self.central_widget)
-        self.add_button = QPushButton('Add Application', self.central_widget)
-        self.remove_button = QPushButton('Remove Selected Application', self.central_widget)
-
-        layout = QVBoxLayout(self.central_widget)
-        layout.addWidget(self.list_widget)
-        layout.addWidget(self.add_button)
-        layout.addWidget(self.remove_button)
-
         self.setCentralWidget(self.central_widget)
+
+        self.list_widget = QListWidget()
+
+        self.add_button = QPushButton('Add Application')
+        self.add_button.setFixedSize(150, 25)
+        self.add_button_layout = QHBoxLayout()
+        self.add_button_layout.addStretch()
+        self.add_button_layout.addWidget(self.add_button)
+        self.add_button_layout.addStretch()
+
+        self.remove_button = QPushButton('Remove Selected Application')
+        self.remove_button.setFixedSize(180, 25)
+        self.remove_button_layout = QHBoxLayout()
+        self.remove_button_layout.addStretch()
+        self.remove_button_layout.addWidget(self.remove_button)
+        self.remove_button_layout.addStretch()
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.list_widget)
+        layout.addLayout(self.add_button_layout)
+        layout.addLayout(self.remove_button_layout)
+
+        self.central_widget.setLayout(layout)
+
         self.add_button.clicked.connect(self.add_exe)
         self.remove_button.clicked.connect(self.remove_selected_entry)
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setToolTip("PyAutoActions")
-        self.tray_icon.setIcon(QIcon(os.path.abspath("Resources/main.ico")))
+        self.tray_icon.setIcon(QIcon(os.path.abspath(r"Resources/main.ico")))
         self.tray_icon.activated.connect(self.tray_icon_activated)
 
         self.menu = QMenu()
-        self.submenu = self.menu.addMenu('Game Launcher')
+        self.menu.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        self.menu.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.menu.setWindowFlags(self.menu.windowFlags() | Qt.WindowType.FramelessWindowHint)
+
+        self.submenu = self.menu.addMenu(QIcon(r"Resources/main.ico"), 'Game Launcher')
+        self.menu.addSeparator()
 
         self.start_hidden_action = QAction('Start In Tray', self.menu)
         self.start_hidden_action.setCheckable(True)
@@ -211,9 +232,9 @@ class MainWindow(QMainWindow):
         self.run_on_boot_action.triggered.connect(self.run_on_boot)
         self.menu.addAction(self.run_on_boot_action)
 
-        about_button = self.menu.addAction(QIcon(fr"Resources\about.ico"), 'About')
+        about_button = self.menu.addAction(QIcon(r"Resources\about.ico"), 'About')
         about_button.triggered.connect(self.about_page)
-        action_exit = self.menu.addAction(QIcon(fr"Resources\exit.ico"), 'Exit')
+        action_exit = self.menu.addAction(QIcon(r"Resources\exit.ico"), 'Exit')
         action_exit.triggered.connect(self.close_tray_icon)
         self.menu.addAction(action_exit)
         start_hidden_checked = self.settings.value("start_hidden", type=bool)
@@ -329,7 +350,6 @@ class MainWindow(QMainWindow):
                         new_action.triggered.connect(lambda checked, p=item_text: self.on_action_triggered(p))
                         self.submenu.addAction(new_action)
                         unique_items_set.add(item_text)
-
 
         except Exception as e:
             self.warning_message_box.warning(self, "PyAutoActions Error", f"create_actions: {e}",
@@ -530,6 +550,9 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == "__main__":
+    with open('custom.css', 'r') as file:
+        stylesheet = file.read()
     app = QApplication(sys.argv)
+    app.setStyleSheet(stylesheet)
     window = MainWindow()
     sys.exit(app.exec())
