@@ -12,12 +12,15 @@
 - **Now compatible with [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR)**
 
 
-![v1 0 0 3](https://github.com/7gxycn08/PyAutoActions/assets/121936658/07d09a8d-d6a7-4626-ac3f-8bb8a1aaa94e)
+![1 0 0 4](https://github.com/7gxycn08/PyAutoActions/assets/121936658/486ccc20-f5c8-4626-b080-f455b3fba251)
 
+
+![1 0 0 4tray](https://github.com/7gxycn08/PyAutoActions/assets/121936658/8375da5c-210b-4633-b8cb-768e5c37cc54)
 
 
 # v1.0.0.3 New feature:
 - **Added Game Launcher from system tray.**
+
 - **Full list of changes are in [Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.3)**
 
 # Usage:
