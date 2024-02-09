@@ -18,15 +18,17 @@
 ![1 0 0 4tray](https://github.com/7gxycn08/PyAutoActions/assets/121936658/8375da5c-210b-4633-b8cb-768e5c37cc54)
 
 
+# v1.0.0.5 Changes:
+- **Bug fixes and Huge performance Improvement**
+
+- **Full list of changes are in [Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.5)**
+  
+
 # v1.0.0.4 Changes:
 - **Added custom css styling.**
 
 - **Full list of changes are in [Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.4)**
 
-# v1.0.0.3 New feature:
-- **Added Game Launcher from system tray.**
-
-- **Full list of changes are in [Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.3)**
 
 # Usage:
 1. **Add `Game` exe path using button.**
