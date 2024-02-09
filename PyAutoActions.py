@@ -19,6 +19,7 @@ class ProcessMonitor(QWidget):
 
     def __init__(self, process_list, toggle_state, use_alternative_hdr):
         super().__init__()
+        self.shutting_down = False
         self.global_hdr_state_status = None
         self.process_check_status = None
         self.exception_msg = None
@@ -45,9 +46,9 @@ class ProcessMonitor(QWidget):
         self.SetGlobalHDRState.__cdecl__ = True
 
     def process_monitor(self):
-        while True:
+        while not self.shutting_down:
             try:
-                if self.process_check_status or self.process_check_status or self.global_hdr_state_status:
+                if self.process_check_status or self.global_hdr_state_status:
                     break
 
                 if not self.found_process:
@@ -113,7 +114,6 @@ class ProcessMonitor(QWidget):
                         process_name_actual = os.path.basename(buffer.value)
                         if process_name_actual == process_name:
                             return True
-
             return False
 
         except Exception as e:
@@ -175,7 +175,7 @@ class MainWindow(QMainWindow):
         self.warning_message_box.setWindowIcon(QIcon(r"Resources/main.ico"))
         self.warning_message_box.setFixedSize(400, 200)
 
-        self.setWindowTitle("PyAutoActions v1.0.0.4")
+        self.setWindowTitle("PyAutoActions v1.0.0.5")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources/main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -212,12 +212,16 @@ class MainWindow(QMainWindow):
         self.tray_icon.setIcon(QIcon(os.path.abspath(r"Resources/main.ico")))
         self.tray_icon.activated.connect(self.tray_icon_activated)
 
-        self.menu = QMenu()
+        self.menu = QMenu(self)
         self.menu.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.menu.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.menu.setWindowFlags(self.menu.windowFlags() | Qt.WindowType.FramelessWindowHint)
 
-        self.submenu = self.menu.addMenu(QIcon(r"Resources/main.ico"), 'Game Launcher')
+        self.submenu = QMenu('Game Launcher', self.menu)
+        self.submenu.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.submenu.setWindowFlags(self.menu.windowFlags() | Qt.WindowType.FramelessWindowHint)
+        self.submenu.setIcon(QIcon(r"Resources/main.ico"))
+        self.menu.addMenu(self.submenu)
         self.menu.addSeparator()
 
         self.start_hidden_action = QAction('Start In Tray', self.menu)
@@ -473,6 +477,7 @@ class MainWindow(QMainWindow):
             self.show_window()
 
     def close_tray_icon(self):
+        self.monitor.shutting_down = True
         QCoreApplication.quit()
 
     def show_window(self):
