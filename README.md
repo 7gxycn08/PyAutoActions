@@ -19,7 +19,7 @@
 
 
 # v1.0.0.5 Changes:
-- **Bug fixes and Huge performance Improvement**
+- **Bug fixes and Huge performance Improvements.**
 
 - **Full list of changes are in [Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.5)**
   
