@@ -18,16 +18,16 @@
 ![1 0 0 4tray](https://github.com/7gxycn08/PyAutoActions/assets/121936658/8375da5c-210b-4633-b8cb-768e5c37cc54)
 
 
+# v1.0.0.6 Changes:
+- **Game icons will automatically show In main window.**
+
+- **Full list of changes are in [Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.6)**
+
+
 # v1.0.0.5 Changes:
 - **Bug fixes and Huge performance Improvements.**
 
 - **Full list of changes are in [Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.5)**
-  
-
-# v1.0.0.4 Changes:
-- **Added custom css styling.**
-
-- **Full list of changes are in [Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.4)**
 
 
 # Usage:
