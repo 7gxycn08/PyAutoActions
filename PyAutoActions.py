@@ -2,7 +2,7 @@ import time
 import threading
 import subprocess
 from PyQt6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget, QPushButton,
-                             QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout)
+                             QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout, QListWidgetItem)
 from PyQt6.QtGui import QIcon, QAction, QPixmap, QImage
 from PyQt6.QtCore import QCoreApplication, QSettings, pyqtSignal, Qt, QSize
 import sys
@@ -25,8 +25,6 @@ class ProcessMonitor(QWidget):
         self.exception_msg = None
         self.finished.connect(self.on_finished_show_msg, Qt.ConnectionType.QueuedConnection)
 
-        self.enable_gamebar_hdr_switch_thread = None
-        self.disable_gamebar_hdr_switch_thread = None
         self.error_thread = None
         self.process_thread = None
         self.enable_hdr_thread = None
@@ -39,7 +37,7 @@ class ProcessMonitor(QWidget):
         self.found_process = False
         self.main_process = None
 
-        self.my_dll = ctypes.CDLL(r"Dependancy\HDRSwitch.dll")
+        self.my_dll = ctypes.CDLL(r"Dependency\HDRSwitch.dll")
         self.SetGlobalHDRState = self.my_dll.SetGlobalHDRState
         self.SetGlobalHDRState.argtypes = [ctypes.c_bool]
         self.SetGlobalHDRState.restype = None
@@ -175,7 +173,7 @@ class MainWindow(QMainWindow):
         self.warning_message_box.setWindowIcon(QIcon(r"Resources/main.ico"))
         self.warning_message_box.setFixedSize(400, 200)
 
-        self.setWindowTitle("PyAutoActions v1.0.0.5")
+        self.setWindowTitle("PyAutoActions v1.0.0.6")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources/main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -518,7 +516,12 @@ class MainWindow(QMainWindow):
                                                      f"Process {exe_path} already exists in the list.",
                                                      QMessageBox.StandardButton.Ok)
                 else:
-                    self.list_widget.insertItem(0, exe_path)
+                    icon = self.get_icon_as_image_object(exe_path)
+                    q_icon = self.pil_image_to_qicon(icon)
+                    list_item = QListWidgetItem()
+                    list_item.setIcon(q_icon)
+                    list_item.setText(exe_path)
+                    self.list_widget.addItem(list_item)
                     self.create_actions()
                     self.process_list.append(exe_path)
                     threading.Thread(target=self.save_config, daemon=True).start()
@@ -547,10 +550,16 @@ class MainWindow(QMainWindow):
                 process_list_str = self.config['HDR_APPS']['processes']
                 processes = process_list_str.split(', ')
                 for process in processes:
-                    self.list_widget.insertItem(0, process)
+                    if process:
+                        icon = self.get_icon_as_image_object(process)
+                        q_icon = self.pil_image_to_qicon(icon)
+                        list_item = QListWidgetItem()
+                        list_item.setIcon(q_icon)
+                        list_item.setText(process)
+                        self.list_widget.addItem(list_item)
                 self.update_classes_variables()
         except Exception as e:
-            self.warning_message_box.warning(self, "PyAutoActions Error", f"load_processess_from_config: {e}",
+            self.warning_message_box.warning(self, "PyAutoActions Error", f"load_processes_from_config: {e}",
                                              QMessageBox.StandardButton.Ok)
 
 
