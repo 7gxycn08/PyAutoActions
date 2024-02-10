@@ -12,7 +12,7 @@
 - **Now compatible with [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR)**
 
 
-![1 0 0 4](https://github.com/7gxycn08/PyAutoActions/assets/121936658/b048283d-193c-4fad-b87b-e42955e7ed0f)
+![Screenshot 2024-02-10 101842](https://github.com/7gxycn08/PyAutoActions/assets/121936658/152f803b-c1ee-4194-8c06-e5785f54f538)
 
 
 ![1 0 0 4tray](https://github.com/7gxycn08/PyAutoActions/assets/121936658/8375da5c-210b-4633-b8cb-768e5c37cc54)
