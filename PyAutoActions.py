@@ -19,8 +19,9 @@ class ProcessMonitor(QWidget):
 
     def __init__(self, process_list, toggle_state, use_alternative_hdr):
         super().__init__()
+        self.count = None
         self.shutting_down = False
-        self.global_hdr_state_status = None
+        self.manual_hdr = None
         self.process_check_status = None
         self.exception_msg = None
         self.finished.connect(self.on_finished_show_msg, Qt.ConnectionType.QueuedConnection)
@@ -46,7 +47,11 @@ class ProcessMonitor(QWidget):
     def process_monitor(self):
         while not self.shutting_down:
             try:
-                if self.process_check_status or self.global_hdr_state_status:
+                if self.manual_hdr and self.count:
+                    time.sleep(20)
+                    self.count = False
+
+                if self.process_check_status:
                     break
 
                 if not self.found_process:
@@ -56,6 +61,7 @@ class ProcessMonitor(QWidget):
                     if self.toggle_state and not self.is_process_running(self.main_process):
                         self.toggle_state = False
                         self.found_process = False
+                        self.manual_hdr = False
                         self.call_set_global_hdr_state()
 
                 time.sleep(5)
@@ -163,7 +169,7 @@ class MainWindow(QMainWindow):
         self.script_path = f"{os.path.abspath(sys.argv[0])}"
         self.task_name = "PyAutoActions"
         self.config = configparser.ConfigParser()
-        self.config.read(r'processlist.ini')
+        self.config.read(r'Resources\processlist.ini')
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
@@ -173,7 +179,7 @@ class MainWindow(QMainWindow):
         self.warning_message_box.setWindowIcon(QIcon(r"Resources/main.ico"))
         self.warning_message_box.setFixedSize(400, 200)
 
-        self.setWindowTitle("PyAutoActions v1.0.0.6")
+        self.setWindowTitle("PyAutoActions v1.0.0.7")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources/main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -371,6 +377,8 @@ class MainWindow(QMainWindow):
             self.monitor.main_process = os.path.basename(path)
             self.monitor.found_process = True
             self.monitor.toggle_state = True
+            self.monitor.manual_hdr = True
+            self.monitor.count = True
             self.monitor.call_set_global_hdr_state()
             threading.Thread(target=lambda: self.run_as_admin(path), daemon=True).start()
         except Exception as e:
@@ -535,7 +543,7 @@ class MainWindow(QMainWindow):
             self.list_str = ', '.join(self.process_list)
             self.config['HDR_APPS']['processes'] = self.list_str
 
-            with open('processlist.ini', 'w') as configfile:
+            with open(r'Resources\processlist.ini', 'w') as configfile:
                 self.config.write(configfile)
                 self.update_classes_variables()
         except Exception as e:
@@ -545,7 +553,7 @@ class MainWindow(QMainWindow):
     def load_processes_from_config(self):
         try:
             self.list_widget.clear()
-            self.config.read('processlist.ini')
+            self.config.read(r'Resources\processlist.ini')
             if 'HDR_APPS' in self.config and 'processes' in self.config['HDR_APPS']:
                 process_list_str = self.config['HDR_APPS']['processes']
                 processes = process_list_str.split(', ')
@@ -564,7 +572,7 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == "__main__":
-    with open('custom.css', 'r') as file:
+    with open(r'Dependency\custom.css', 'r') as file:
         stylesheet = file.read()
     app = QApplication(sys.argv)
     app.setStyleSheet(stylesheet)
