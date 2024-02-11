@@ -75,11 +75,11 @@ class ProcessMonitor(QWidget):
     def process_check(self):
         try:
             for process in self.process_list:
-                if self.is_process_running(process):
+                if self.is_process_running(os.path.basename(process)):
                     if not self.toggle_state:
                         self.toggle_state = True
                         self.found_process = True
-                        self.main_process = process
+                        self.main_process = os.path.basename(process)
                         self.enable_hdr_thread = threading.Thread(
                             target=self.call_set_global_hdr_state, daemon=True)
                         self.enable_hdr_thread.start()
@@ -179,7 +179,7 @@ class MainWindow(QMainWindow):
         self.warning_message_box.setWindowIcon(QIcon(r"Resources/main.ico"))
         self.warning_message_box.setFixedSize(400, 200)
 
-        self.setWindowTitle("PyAutoActions v1.0.0.7")
+        self.setWindowTitle("PyAutoActions v1.0.0.8")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources/main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
