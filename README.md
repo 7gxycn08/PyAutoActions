@@ -18,15 +18,14 @@
 ![1 0 0 4tray](https://github.com/7gxycn08/PyAutoActions/assets/121936658/8375da5c-210b-4633-b8cb-768e5c37cc54)
 
 
+# v1.0.0.8 Changes:
+- **Fixed logic Issue In process monitor class.**
+
+
 # v1.0.0.7 Changes:
 - **Fixed issue where hdr will disable when launching a game manually with Game Launcher.**
 
 - **Full list of changes are in [Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.7)**
-
-# v1.0.0.6 Changes:
-- **Game icons will automatically show In main window.**
-
-- **Full list of changes are in [Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.6)**
 
 
 # Usage:
