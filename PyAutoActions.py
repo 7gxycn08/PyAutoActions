@@ -169,7 +169,7 @@ class MainWindow(QMainWindow):
         self.script_path = f"{os.path.abspath(sys.argv[0])}"
         self.task_name = "PyAutoActions"
         self.config = configparser.ConfigParser()
-        self.config.read(r'Resources\processlist.ini')
+        self.config.read(r'Dependency\processlist.ini')
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
@@ -543,7 +543,7 @@ class MainWindow(QMainWindow):
             self.list_str = ', '.join(self.process_list)
             self.config['HDR_APPS']['processes'] = self.list_str
 
-            with open(r'Resources\processlist.ini', 'w') as configfile:
+            with open(r'Dependency\processlist.ini', 'w') as configfile:
                 self.config.write(configfile)
                 self.update_classes_variables()
         except Exception as e:
@@ -553,7 +553,7 @@ class MainWindow(QMainWindow):
     def load_processes_from_config(self):
         try:
             self.list_widget.clear()
-            self.config.read(r'Resources\processlist.ini')
+            self.config.read(r'Dependency\processlist.ini')
             if 'HDR_APPS' in self.config and 'processes' in self.config['HDR_APPS']:
                 process_list_str = self.config['HDR_APPS']['processes']
                 processes = process_list_str.split(', ')
@@ -572,7 +572,7 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == "__main__":
-    with open(r'Dependency\custom.css', 'r') as file:
+    with open(r'Resources\custom.css', 'r') as file:
         stylesheet = file.read()
     app = QApplication(sys.argv)
     app.setStyleSheet(stylesheet)
