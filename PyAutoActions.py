@@ -1,6 +1,7 @@
 import time
 import threading
 import subprocess
+import winsound
 from PyQt6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget, QPushButton,
                              QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout, QListWidgetItem)
 from PyQt6.QtGui import QIcon, QAction, QPixmap, QImage
@@ -51,9 +52,6 @@ class ProcessMonitor(QWidget):
                     time.sleep(20)
                     self.count = False
 
-                if self.process_check_status:
-                    break
-
                 if not self.found_process:
                     self.process_thread = threading.Thread(target=self.process_check, daemon=True)
                     self.process_thread.start()
@@ -87,7 +85,7 @@ class ProcessMonitor(QWidget):
                         break
 
         except Exception as e:
-            self.process_check_status = True
+            self.shutting_down = True
             self.exception_msg = f"process_check: {e}"
             self.finished.emit()
             return
@@ -139,6 +137,7 @@ class ProcessMonitor(QWidget):
         warning_message_box.setFixedSize(400, 200)
         warning_message_box.setIcon(QMessageBox.Icon.Critical)
         warning_message_box.setText(f"{self.exception_msg}")
+        winsound.MessageBeep()
         warning_message_box.exec()
 
 
@@ -157,9 +156,13 @@ class BITMAPINFOHEADER(ctypes.Structure):
 
 
 class MainWindow(QMainWindow):
+    warning_signal = pyqtSignal()
+
     def __init__(self):
         super().__init__()
         self.settings = QSettings("7gxycn08@Github", "PyAutoActions")
+        self.warning_signal.connect(self.warning_box, Qt.ConnectionType.QueuedConnection)
+        self.exception_msg = None
         self.ICON_SIZE = 64
         self.action_names = []
         self.use_alternative_hdr = None
@@ -173,13 +176,7 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.warning_message_box = QMessageBox(self)
-        self.warning_message_box.setIcon(QMessageBox.Icon.Warning)
-        self.warning_message_box.setWindowTitle("PyAutoActions Error")
-        self.warning_message_box.setWindowIcon(QIcon(r"Resources/main.ico"))
-        self.warning_message_box.setFixedSize(400, 200)
-
-        self.setWindowTitle("PyAutoActions v1.0.0.8")
+        self.setWindowTitle("PyAutoActions v1.0.0.9")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources/main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -259,14 +256,25 @@ class MainWindow(QMainWindow):
         self.load_processes_from_config()
         self.create_actions()
 
+    def warning_box(self):
+        warning_message_box = QMessageBox(self)
+        warning_message_box.setIcon(QMessageBox.Icon.Warning)
+        warning_message_box.setWindowTitle("PyAutoActions Error")
+        warning_message_box.setWindowIcon(QIcon(r"Resources/main.ico"))
+        warning_message_box.setFixedSize(400, 200)
+        warning_message_box.setText(f"{self.exception_msg}")
+        winsound.MessageBeep()
+        warning_message_box.exec()
+
+
     def extract_icon(self, file_path, icon_index=0):
         try:
             icon_handle = ctypes.windll.shell32.ExtractIconW(0, file_path, icon_index)
             if icon_handle <= 1:
                 return None
         except Exception as e:
-            self.warning_message_box.warning(self, "PyAutoActions Error", f"extract_icon: {e}",
-                                             QMessageBox.StandardButton.Ok)
+            self.exception_msg = f"extract_icon: {e}"
+            self.warning_signal.emit()
             return None
 
         return icon_handle
@@ -310,9 +318,8 @@ class MainWindow(QMainWindow):
 
             return im
         else:
-            self.warning_message_box.warning(self, "PyAutoActions Error",
-                                             "get_icon_as_image_object: Failed to get image object",
-                                             QMessageBox.StandardButton.Ok)
+            self.exception_msg = "get_icon_as_image_object: Failed to get image object"
+            self.warning_signal.emit()
             return None
 
     def resize_pixmap(self, pixmap, width, height):
@@ -360,8 +367,8 @@ class MainWindow(QMainWindow):
                         unique_items_set.add(item_text)
 
         except Exception as e:
-            self.warning_message_box.warning(self, "PyAutoActions Error", f"create_actions: {e}",
-                                             QMessageBox.StandardButton.Ok)
+            self.exception_msg = f"create_actions: {e}"
+            self.warning_signal.emit()
 
     def run_as_admin(self, executable_path):
         try:
@@ -369,8 +376,8 @@ class MainWindow(QMainWindow):
 
             ctypes.windll.shell32.ShellExecuteW(None, "runas", executable_path, None, folder_path, 1)
         except Exception as e:
-            self.warning_message_box.warning(self, "PyAutoActions Error", f"run_as_admin: {e}",
-                                             QMessageBox.StandardButton.Ok)
+            self.exception_msg = f"run_as_admin: {e}"
+            self.warning_signal.emit()
 
     def on_action_triggered(self, path):
         try:
@@ -382,8 +389,8 @@ class MainWindow(QMainWindow):
             self.monitor.call_set_global_hdr_state()
             threading.Thread(target=lambda: self.run_as_admin(path), daemon=True).start()
         except Exception as e:
-            self.warning_message_box.warning(self, "PyAutoActions Error", f"on_action_triggered: {e}",
-                                             QMessageBox.StandardButton.Ok)
+            self.exception_msg = f"on_action_triggered: {e}"
+            self.warning_signal.emit()
 
     def update_classes_variables(self):
         self.monitor.toggle_state = self.toggle_state
@@ -410,8 +417,8 @@ class MainWindow(QMainWindow):
                 root_folder.DeleteTask(self.task_name, 0)
 
             except Exception as e:
-                self.warning_message_box.warning(self, "PyAutoActions Error", f"remove_task: {e}",
-                                                 QMessageBox.StandardButton.Ok)
+                self.exception_msg = f"remove_task: {e}"
+                self.warning_signal.emit()
 
     def toggle_start_hidden(self):
         checked = self.start_hidden_action.isChecked()
@@ -430,8 +437,8 @@ class MainWindow(QMainWindow):
             except:
                 return False
         except Exception as e:
-            self.warning_message_box.warning(self, "PyAutoActions Error", f"is_task_installed: {e}",
-                                             QMessageBox.StandardButton.Ok)
+            self.exception_msg = f"is_task_installed: {e}"
+            self.warning_signal.emit()
 
     def register_as_task(self):
         if not self.is_task_installed():
@@ -467,8 +474,8 @@ class MainWindow(QMainWindow):
                     3
                 )
             except Exception as e:
-                self.warning_message_box.warning(self, "PyAutoActions Error", f"register_as_task: {e}",
-                                                 QMessageBox.StandardButton.Ok)
+                self.exception_msg = f"register_as_task: {e}"
+                self.warning_signal.emit()
 
     def about_page(self):
         subprocess.Popen("start https://github.com/7gxycn08/PyAutoActions",
@@ -504,13 +511,15 @@ class MainWindow(QMainWindow):
                 self.create_actions()
                 self.update_classes_variables()
             else:
-                self.warning_message_box.warning(self, "PyAutoActions Error", "Nothing to remove.",
-                                                 QMessageBox.StandardButton.Ok)
+                self.exception_msg = "Nothing to remove."
+                self.warning_signal.emit()
+
         except ValueError as ve:
-            self.warning_message_box.warning(self, f"PyAutoActions Error:", {ve}, QMessageBox.StandardButton.Ok)
+            self.exception_msg = ve
+            self.warning_signal.emit()
         except Exception as e:
-            self.warning_message_box.warning(self, "PyAutoActions Error", f"Nothing to remove. {e}",
-                                             QMessageBox.StandardButton.Ok)
+            self.exception_msg = f"Nothing to remove. {e}"
+            self.warning_signal.emit()
 
     def add_exe(self):
         try:
@@ -519,10 +528,9 @@ class MainWindow(QMainWindow):
             if file_path:
                 exe_path = os.path.abspath(file_path)
                 if exe_path in self.process_list:
+                    self.exception_msg = f"Process {exe_path} already exists in the list."
+                    self.warning_signal.emit()
 
-                    self.warning_message_box.warning(self, "PyAutoActions Error",
-                                                     f"Process {exe_path} already exists in the list.",
-                                                     QMessageBox.StandardButton.Ok)
                 else:
                     icon = self.get_icon_as_image_object(exe_path)
                     q_icon = self.pil_image_to_qicon(icon)
@@ -535,8 +543,8 @@ class MainWindow(QMainWindow):
                     threading.Thread(target=self.save_config, daemon=True).start()
                     self.update_classes_variables()
         except Exception as e:
-            self.warning_message_box.warning(self, "PyAutoActions Error", f"add_exe: {e}",
-                                             QMessageBox.StandardButton.Ok)
+            self.exception_msg = f"add_exe: {e}"
+            self.warning_signal.emit()
 
     def save_config(self):
         try:
@@ -547,8 +555,8 @@ class MainWindow(QMainWindow):
                 self.config.write(configfile)
                 self.update_classes_variables()
         except Exception as e:
-            self.warning_message_box.warning(self, "PyAutoActions Error", f"save_config: {e}",
-                                             QMessageBox.StandardButton.Ok)
+            self.exception_msg = f"save_config: {e}"
+            self.warning_signal.emit()
 
     def load_processes_from_config(self):
         try:
@@ -567,14 +575,15 @@ class MainWindow(QMainWindow):
                         self.list_widget.addItem(list_item)
                 self.update_classes_variables()
         except Exception as e:
-            self.warning_message_box.warning(self, "PyAutoActions Error", f"load_processes_from_config: {e}",
-                                             QMessageBox.StandardButton.Ok)
+            self.exception_msg = f"load_processes_from_config: {e}"
+            self.warning_signal.emit()
 
 
 if __name__ == "__main__":
     with open(r'Resources\custom.css', 'r') as file:
         stylesheet = file.read()
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
     app.setStyleSheet(stylesheet)
     window = MainWindow()
     sys.exit(app.exec())
