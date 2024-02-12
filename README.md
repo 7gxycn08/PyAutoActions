@@ -18,7 +18,7 @@
 ![1 0 0 4tray](https://github.com/7gxycn08/PyAutoActions/assets/121936658/8375da5c-210b-4633-b8cb-768e5c37cc54)
 
 
-# v1.0.0.8 Changes:
+# v1.0.0.9 Changes:
 - **Added extra CSS styling to main window buttons so it looks pleasant.**
 - **Added CSS styling to message box.**
 - **Full list of changes In** ![Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.9)
