@@ -12,20 +12,20 @@
 - **Now compatible with [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR)**
 
 
-![Screenshot 2024-02-10 101842](https://github.com/7gxycn08/PyAutoActions/assets/121936658/152f803b-c1ee-4194-8c06-e5785f54f538)
+![Screenshot 2024-02-12 144237](https://github.com/7gxycn08/PyAutoActions/assets/121936658/43ed6f20-c05a-44a1-8a91-567fc535016f)
 
 
 ![1 0 0 4tray](https://github.com/7gxycn08/PyAutoActions/assets/121936658/8375da5c-210b-4633-b8cb-768e5c37cc54)
 
 
 # v1.0.0.8 Changes:
+- **Added extra CSS styling to main window buttons so it looks pleasant.**
+- **Added CSS styling to message box.**
+- **Full list of changes In** ![Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.9)
+
+
+# v1.0.0.8 Changes:
 - **Fixed logic Issue In process monitor class.**
-
-
-# v1.0.0.7 Changes:
-- **Fixed issue where hdr will disable when launching a game manually with Game Launcher.**
-
-- **Full list of changes are in [Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.7)**
 
 
 # Usage:
