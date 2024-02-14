@@ -1,10 +1,11 @@
 import time
 import threading
+import concurrent.futures
 import subprocess
 import winsound
 from PyQt6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget, QPushButton,
                              QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout, QListWidgetItem)
-from PyQt6.QtGui import QIcon, QAction, QPixmap, QImage
+from PyQt6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup
 from PyQt6.QtCore import QCoreApplication, QSettings, pyqtSignal, Qt, QSize
 import sys
 import os
@@ -20,6 +21,7 @@ class ProcessMonitor(QWidget):
 
     def __init__(self, process_list, toggle_state, use_alternative_hdr):
         super().__init__()
+        self.delay = None
         self.count = None
         self.shutting_down = False
         self.manual_hdr = None
@@ -62,7 +64,13 @@ class ProcessMonitor(QWidget):
                         self.manual_hdr = False
                         self.call_set_global_hdr_state()
 
-                time.sleep(5)
+                if self.delay == "High":
+                    time.sleep(5)
+                elif self.delay == "Medium":
+                    time.sleep(3)
+                elif self.delay == "Low":
+                    time.sleep(1)
+
             except RuntimeError:
                 break
             except Exception as e:
@@ -176,9 +184,40 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.setWindowTitle("PyAutoActions v1.0.0.9")
+        self.setWindowTitle("PyAutoActions v1.0.1.0")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources/main.ico")))
         self.setGeometry(100, 100, 600, 400)
+
+        self.menu_bar = self.menuBar()
+        self.file_menu = self.menu_bar.addMenu('File')
+        self.about_in_menubar = QAction(QIcon(r"Resources\about.ico"), 'About', self.file_menu)
+        self.about_in_menubar.triggered.connect(self.about_page)
+        self.exit_from_menubar = QAction(QIcon(r"Resources\exit.ico"), 'Exit Application', self.file_menu)
+        self.exit_from_menubar.triggered.connect(self.close_tray_icon)
+        self.file_menu.addActions([self.about_in_menubar, self.exit_from_menubar])
+
+        self.delay_menu = self.menu_bar.addMenu('Detection')
+        self.low_delay = QAction('Low', self.delay_menu)
+        self.low_delay.setCheckable(True)
+        self.low_delay.triggered.connect(lambda: self.update_delay("Low"))
+
+        self.medium_delay = QAction('Medium', self.delay_menu)
+        self.medium_delay.setCheckable(True)
+        self.medium_delay.triggered.connect(lambda: self.update_delay("Medium"))
+
+        self.high_delay = QAction('High', self.delay_menu)
+        self.high_delay.setCheckable(True)
+        self.high_delay.triggered.connect(lambda: self.update_delay("High"))
+
+        self.delay_menu.addActions([self.low_delay, self.medium_delay, self.high_delay])
+
+        self.action_group = QActionGroup(self)
+        self.action_group.addAction(self.low_delay)
+        self.action_group.addAction(self.medium_delay)
+        self.action_group.addAction(self.high_delay)
+        self.action_group.setExclusive(True)
+        self.restore_group_settings()
+        self.action_group.triggered.connect(self.save_group_settings)
 
         self.central_widget = QWidget(self)
         self.setCentralWidget(self.central_widget)
@@ -229,32 +268,54 @@ class MainWindow(QMainWindow):
         self.start_hidden_action.setCheckable(True)
         self.start_hidden_action.setChecked(self.settings.value("start_hidden", type=bool))
         self.start_hidden_action.triggered.connect(self.toggle_start_hidden)
-        self.menu.addAction(self.start_hidden_action)
 
         self.run_on_boot_action = QAction('Run on System Boot', self.menu)
         self.run_on_boot_action.setCheckable(True)
         self.run_on_boot_action.setChecked(self.settings.value("run_on_boot", type=bool))
         self.run_on_boot_action.triggered.connect(self.run_on_boot)
-        self.menu.addAction(self.run_on_boot_action)
 
-        about_button = self.menu.addAction(QIcon(r"Resources\about.ico"), 'About')
-        about_button.triggered.connect(self.about_page)
-        action_exit = self.menu.addAction(QIcon(r"Resources\exit.ico"), 'Exit')
-        action_exit.triggered.connect(self.close_tray_icon)
-        self.menu.addAction(action_exit)
-        start_hidden_checked = self.settings.value("start_hidden", type=bool)
-        self.start_hidden_action.setChecked(start_hidden_checked)
+        self.about_button = QAction(QIcon(r"Resources\about.ico"), 'About')
+        self.about_button.triggered.connect(self.about_page)
+
+        self.action_exit = QAction(QIcon(r"Resources\exit.ico"), 'Exit')
+        self.action_exit.triggered.connect(self.close_tray_icon)
+
+        self.menu.addActions([self.start_hidden_action, self.run_on_boot_action, self.about_button, self.action_exit])
+        self.start_hidden_checked = self.settings.value("start_hidden", type=bool)
+        self.start_hidden_action.setChecked(self.start_hidden_checked)
         self.tray_icon.setContextMenu(self.menu)
-        if start_hidden_checked:
-            self.hide()
-        else:
-            self.show()
+
         self.tray_icon.show()
         self.monitor = ProcessMonitor(self.process_list, self.toggle_state, self.use_alternative_hdr)
         self.monitor_thread = threading.Thread(target=self.monitor.process_monitor)
         self.monitor_thread.start()
-        self.load_processes_from_config()
-        self.create_actions()
+        delay = self.settings.value("GroupSettings")
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            [executor.submit(do_checks) for do_checks in [self.load_processes_from_config, self.create_actions,
+                                                          self.start_hidden_check, lambda: self.update_delay(delay)]]
+
+    def save_group_settings(self):
+        for action in self.action_group.actions():
+            if action.isChecked():
+                self.settings.setValue("GroupSettings", action.text())
+                break
+
+    def restore_group_settings(self):
+        checked_action = self.settings.value("GroupSettings", "High")
+        for action in self.action_group.actions():
+            if action.text() == checked_action:
+                action.setChecked(True)
+                break
+
+    def start_hidden_check(self):
+        if self.start_hidden_checked:
+            self.hide()
+        else:
+            self.show()
+
+    def update_delay(self, delay):
+        self.monitor.delay = delay
 
     def warning_box(self):
         warning_message_box = QMessageBox(self)
@@ -265,7 +326,6 @@ class MainWindow(QMainWindow):
         warning_message_box.setText(f"{self.exception_msg}")
         winsound.MessageBeep()
         warning_message_box.exec()
-
 
     def extract_icon(self, file_path, icon_index=0):
         try:
