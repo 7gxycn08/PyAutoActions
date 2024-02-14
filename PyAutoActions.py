@@ -1,6 +1,5 @@
 import time
 import threading
-import concurrent.futures
 import subprocess
 import winsound
 from PyQt6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget, QPushButton,
@@ -252,7 +251,7 @@ class MainWindow(QMainWindow):
         self.tray_icon.setIcon(QIcon(os.path.abspath(r"Resources/main.ico")))
         self.tray_icon.activated.connect(self.tray_icon_activated)
 
-        self.menu = QMenu(self)
+        self.menu = QMenu()
         self.menu.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.menu.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.menu.setWindowFlags(self.menu.windowFlags() | Qt.WindowType.FramelessWindowHint)
@@ -284,16 +283,15 @@ class MainWindow(QMainWindow):
         self.start_hidden_checked = self.settings.value("start_hidden", type=bool)
         self.start_hidden_action.setChecked(self.start_hidden_checked)
         self.tray_icon.setContextMenu(self.menu)
-
+        self.start_hidden_check()
         self.tray_icon.show()
         self.monitor = ProcessMonitor(self.process_list, self.toggle_state, self.use_alternative_hdr)
         self.monitor_thread = threading.Thread(target=self.monitor.process_monitor)
         self.monitor_thread.start()
         delay = self.settings.value("GroupSettings")
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            [executor.submit(do_checks) for do_checks in [self.load_processes_from_config, self.create_actions,
-                                                          self.start_hidden_check, lambda: self.update_delay(delay)]]
+        self.update_delay(delay)
+        self.load_processes_from_config()
+        self.create_actions()
 
     def save_group_settings(self):
         for action in self.action_group.actions():
