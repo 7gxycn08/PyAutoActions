@@ -33,7 +33,7 @@
 
 # Detection:
 1. **Contains three settings `High`, `Meduim`, `Low`. Default Is `High`.**
-2. **Using `Medium` or `Low` will speed up the switching state of HDR when a game Is detected.**
+2. **Using `Medium` or `Low` will speed up the switching state of HDR when a game Is launched.**
 3. **User settings will be saved and loaded automatically upon application relaunch.**
 
 # Usage:
