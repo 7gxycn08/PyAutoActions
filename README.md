@@ -12,10 +12,16 @@
 - **Now compatible with [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR)**
 
 
-![Screenshot 2024-02-12 144237](https://github.com/7gxycn08/PyAutoActions/assets/121936658/43ed6f20-c05a-44a1-8a91-567fc535016f)
+![1010](https://github.com/7gxycn08/PyAutoActions/assets/121936658/de48800e-d329-4103-8584-62bed06ba02f)
+
 
 
 ![1 0 0 4tray](https://github.com/7gxycn08/PyAutoActions/assets/121936658/8375da5c-210b-4633-b8cb-768e5c37cc54)
+
+
+# v1.0.1.0 Changes:
+- **Added process detection frequency selection In main window.**
+- **Faster program starup**.
 
 
 # v1.0.0.9 Changes:
@@ -24,9 +30,10 @@
 - **Full list of changes In** ![Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.0.9)
 
 
-# v1.0.0.8 Changes:
-- **Fixed logic Issue In process monitor class.**
-
+# Detection:
+1. **Contains three settings `High`, `Meduim`, `Low`. Default Is `High`.**
+2. **Using `Medium` or `Low` will speed up the switching state of HDR when a game Is detected.**
+3. **User settings will be saved and loaded automatically upon application relaunch.**
 
 # Usage:
 1. **Add `Game` exe path using button.**
