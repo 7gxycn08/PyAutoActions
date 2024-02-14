@@ -21,7 +21,8 @@
 
 # v1.0.1.0 Changes:
 - **Added process detection frequency selection In main window.**
-- **Faster program starup**.
+- **Faster program startup**.
+- - **Full list of changes In** ![Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.1.0)
 
 
 # v1.0.0.9 Changes:
