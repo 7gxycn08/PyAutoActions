@@ -19,18 +19,6 @@
 ![1 0 0 4tray](https://github.com/7gxycn08/PyAutoActions/assets/121936658/8375da5c-210b-4633-b8cb-768e5c37cc54)
 
 
-
-# v1.0.1.1 Changes:
-- **Made some design adjustments to main window.**
-- **Main window layout no longer nested.**
-
-
-# v1.0.1.0 Changes:
-- **Added process detection frequency selection In main window.**
-- **Faster program startup**.
-- **Full list of changes In** ![Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.1.0)
-
-
 # Detection:
 1. **Contains three settings `High`, `Meduim`, `Low`. Default Is `High`.**
 2. **Using `Medium` or `Low` will speed up the switching state of HDR when a game Is launched.**
@@ -53,6 +41,17 @@
 
 
 6. **When using [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR) to force windows auto hdr,<br> system hdr is required to be enabled before game start. Launching the game from system tray Is required.**
+
+
+# v1.0.1.1 Changes:
+- **Made some design adjustments to main window.**
+- **Main window layout no longer nested.**
+
+
+# v1.0.1.0 Changes:
+- **Added process detection frequency selection In main window.**
+- **Faster program startup**.
+- **Full list of changes In** ![Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.1.0)
 
 
 # TODO:
