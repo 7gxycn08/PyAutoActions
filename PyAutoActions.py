@@ -3,7 +3,8 @@ import threading
 import subprocess
 import winsound
 from PyQt6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget, QPushButton,
-                             QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout, QListWidgetItem)
+                             QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout, QListWidgetItem,
+                             QSizePolicy)
 from PyQt6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup
 from PyQt6.QtCore import QCoreApplication, QSettings, pyqtSignal, Qt, QSize
 import sys
@@ -183,15 +184,15 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.setWindowTitle("PyAutoActions v1.0.1.0")
+        self.setWindowTitle("PyAutoActions v1.0.1.1")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources/main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
         self.menu_bar = self.menuBar()
         self.file_menu = self.menu_bar.addMenu('File')
-        self.about_in_menubar = QAction(QIcon(r"Resources\about.ico"), 'About', self.file_menu)
+        self.about_in_menubar = QAction(QIcon(r"Resources\about.ico"), 'About', self)
         self.about_in_menubar.triggered.connect(self.about_page)
-        self.exit_from_menubar = QAction(QIcon(r"Resources\exit.ico"), 'Exit Application', self.file_menu)
+        self.exit_from_menubar = QAction(QIcon(r"Resources\exit.ico"), 'Exit Application', self)
         self.exit_from_menubar.triggered.connect(self.close_tray_icon)
         self.file_menu.addActions([self.about_in_menubar, self.exit_from_menubar])
 
@@ -222,27 +223,27 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.central_widget)
 
         self.list_widget = QListWidget()
+        size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.list_widget.setSizePolicy(size_policy)
 
         self.add_button = QPushButton('Add Application')
+        self.remove_button = QPushButton('Remove Application')
+
         self.add_button.setFixedSize(150, 25)
-        self.add_button_layout = QHBoxLayout()
-        self.add_button_layout.addStretch()
-        self.add_button_layout.addWidget(self.add_button)
-        self.add_button_layout.addStretch()
+        self.remove_button.setFixedSize(150, 25)
 
-        self.remove_button = QPushButton('Remove Selected Application')
-        self.remove_button.setFixedSize(180, 25)
-        self.remove_button_layout = QHBoxLayout()
-        self.remove_button_layout.addStretch()
-        self.remove_button_layout.addWidget(self.remove_button)
-        self.remove_button_layout.addStretch()
+        layout = QVBoxLayout(self.central_widget)
+        layout.setContentsMargins(5, 0, 5, 10)
+        layout.setSpacing(5)
+        button_layout = QHBoxLayout()
 
-        layout = QVBoxLayout()
         layout.addWidget(self.list_widget)
-        layout.addLayout(self.add_button_layout)
-        layout.addLayout(self.remove_button_layout)
+        layout.addLayout(button_layout)
 
-        self.central_widget.setLayout(layout)
+        button_layout.addStretch()
+        button_layout.addWidget(self.add_button)
+        button_layout.addWidget(self.remove_button)
+        button_layout.addStretch()
 
         self.add_button.clicked.connect(self.add_exe)
         self.remove_button.clicked.connect(self.remove_selected_entry)
