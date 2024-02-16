@@ -43,15 +43,10 @@
 6. **When using [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR) to force windows auto hdr,<br> system hdr is required to be enabled before game start. Launching the game from system tray Is required.**
 
 
-# v1.0.1.1 Changes:
-- **Made some design adjustments to main window.**
-- **Main window layout no longer nested.**
-
-
-# v1.0.1.0 Changes:
-- **Added process detection frequency selection In main window.**
-- **Faster program startup**.
-- **Full list of changes In** ![Releases](https://github.com/7gxycn08/PyAutoActions/releases/tag/v1.0.1.0)
+# Latest Changes:
+- **HDR will now enable or disable on the fly when game is added or removed while running.**
+- **Added low level method that gets current global hdr state.**
+- **HDR Is enabled or disabled dynamically now via the new method.**
 
 
 # TODO:
