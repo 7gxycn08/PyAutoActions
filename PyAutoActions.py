@@ -14,12 +14,13 @@ import ctypes
 import win32com.client
 from PIL import Image
 import io
+import uuid
 
 
 class ProcessMonitor(QWidget):
     finished = pyqtSignal()
 
-    def __init__(self, process_list, toggle_state, use_alternative_hdr):
+    def __init__(self, process_list, use_alternative_hdr):
         super().__init__()
         self.delay = None
         self.count = None
@@ -36,16 +37,24 @@ class ProcessMonitor(QWidget):
 
         self.use_alternative_hdr = use_alternative_hdr
         self.process_list = process_list
-        self.toggle_state = toggle_state
 
         self.found_process = False
         self.main_process = None
 
-        self.my_dll = ctypes.CDLL(r"Dependency\HDRSwitch.dll")
-        self.SetGlobalHDRState = self.my_dll.SetGlobalHDRState
+        self.hdr_switch = ctypes.CDLL(r"Dependency\HDRSwitch.dll")
+        self.SetGlobalHDRState = self.hdr_switch.SetGlobalHDRState
         self.SetGlobalHDRState.argtypes = [ctypes.c_bool]
         self.SetGlobalHDRState.restype = None
-        self.SetGlobalHDRState.__cdecl__ = True
+
+        self.is_hdr_running = self.hdr_switch.GetGlobalHDRState
+        self.is_hdr_running.argtypes = [ctypes.c_uint32]
+        self.is_hdr_running.restype = ctypes.c_bool
+        self.uid = int(uuid.uuid4())
+        self.toggle_state = self.is_hdr_running(ctypes.c_uint32(self.uid))
+
+
+    def check_hdr_state(self):
+        self.toggle_state = self.is_hdr_running(ctypes.c_uint32(self.uid))
 
     def process_monitor(self):
         while not self.shutting_down:
@@ -58,8 +67,8 @@ class ProcessMonitor(QWidget):
                     self.process_thread = threading.Thread(target=self.process_check, daemon=True)
                     self.process_thread.start()
                 else:
+                    self.check_hdr_state()
                     if self.toggle_state and not self.is_process_running(self.main_process):
-                        self.toggle_state = False
                         self.found_process = False
                         self.manual_hdr = False
                         self.call_set_global_hdr_state()
@@ -82,8 +91,8 @@ class ProcessMonitor(QWidget):
         try:
             for process in self.process_list:
                 if self.is_process_running(os.path.basename(process)):
+                    self.check_hdr_state()
                     if not self.toggle_state:
-                        self.toggle_state = True
                         self.found_process = True
                         self.main_process = os.path.basename(process)
                         self.enable_hdr_thread = threading.Thread(
@@ -133,7 +142,13 @@ class ProcessMonitor(QWidget):
 
     def call_set_global_hdr_state(self):
         try:
-            self.SetGlobalHDRState(bool(self.toggle_state))
+            self.check_hdr_state()
+            if self.toggle_state:
+                state = False
+                self.SetGlobalHDRState(state)
+            elif not self.toggle_state:
+                state = True
+                self.SetGlobalHDRState(state)
         except Exception as e:
             self.exception_msg = f"call_set_global_hdr_state: {e}"
             self.finished.emit()
@@ -176,7 +191,6 @@ class MainWindow(QMainWindow):
         self.use_alternative_hdr = None
         self.monitor_thread = None
         self.boot_status = None
-        self.toggle_state = False
         self.script_path = f"{os.path.abspath(sys.argv[0])}"
         self.task_name = "PyAutoActions"
         self.config = configparser.ConfigParser()
@@ -184,7 +198,7 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.setWindowTitle("PyAutoActions v1.0.1.1")
+        self.setWindowTitle("PyAutoActions v1.0.1.2")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources/main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -286,7 +300,7 @@ class MainWindow(QMainWindow):
         self.tray_icon.setContextMenu(self.menu)
         self.start_hidden_check()
         self.tray_icon.show()
-        self.monitor = ProcessMonitor(self.process_list, self.toggle_state, self.use_alternative_hdr)
+        self.monitor = ProcessMonitor(self.process_list, self.use_alternative_hdr)
         self.monitor_thread = threading.Thread(target=self.monitor.process_monitor)
         self.monitor_thread.start()
         delay = self.settings.value("GroupSettings")
@@ -442,7 +456,6 @@ class MainWindow(QMainWindow):
         try:
             self.monitor.main_process = os.path.basename(path)
             self.monitor.found_process = True
-            self.monitor.toggle_state = True
             self.monitor.manual_hdr = True
             self.monitor.count = True
             self.monitor.call_set_global_hdr_state()
@@ -452,7 +465,6 @@ class MainWindow(QMainWindow):
             self.warning_signal.emit()
 
     def update_classes_variables(self):
-        self.monitor.toggle_state = self.toggle_state
         self.monitor.process_list = self.process_list
 
     def run_on_boot(self):
@@ -569,6 +581,11 @@ class MainWindow(QMainWindow):
                 self.list_widget.takeItem(self.list_widget.row(selected_item))
                 self.create_actions()
                 self.update_classes_variables()
+
+                if self.monitor.toggle_state and self.monitor.found_process:
+                    self.monitor.found_process = False
+                    self.monitor.call_set_global_hdr_state()
+
             else:
                 self.exception_msg = "Nothing to remove."
                 self.warning_signal.emit()
