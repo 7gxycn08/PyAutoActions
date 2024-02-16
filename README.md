@@ -1,55 +1,44 @@
 # PyAutoActions
 
+PyAutoActions automates HDR management for your games and applications, enabling and disabling HDR based on the process status. It's designed to work seamlessly with low system impact and integrates perfectly with [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR) for enhanced compatibility.
 
-- **HDR will be enabled and disabled automatically for added processes.**
+## Features
 
+- **Automatic HDR Toggle**: Automatically enables HDR when a game starts and disables it upon closure.
+- **Low System Impact**: Operates efficiently using only 3 threads and minimal CPU usage.
+- **Tray Functionality**: Resides in the system tray for easy access and minimal interference.
+- **Game Launcher**: Launch games directly from the system tray to ensure HDR settings are correctly applied.
+- **Compatibility**: Works in tandem with ForceAutoHDR for games not officially supported by AutoHDR.
 
-- ex: `When you start a game hdr will turn on and when you close It will turn off.`
-- **Games can be added via filedialog using the button.**
-- **Very low cpu usage runs on 3 threads only.**
-- **Runs In tray.**
-- **Can launch games manually from system tray.**
-- **Now compatible with [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR)**
+![PyAutoActions Interface](https://github.com/7gxycn08/PyAutoActions/assets/121936658/397c1e03-bd75-4cbf-aa47-5aedf4f1e8b3)
 
+![System Tray Example](https://github.com/7gxycn08/PyAutoActions/assets/121936658/8375da5c-210b-4633-b8cb-768e5c37cc54)
 
-![1 0 1 1](https://github.com/7gxycn08/PyAutoActions/assets/121936658/397c1e03-bd75-4cbf-aa47-5aedf4f1e8b3)
+## Detection Settings
 
+- **Adjustable Sensitivity**: Choose from `High`, `Medium`, or `Low` sensitivity for HDR switching.
+- **User Preferences**: Settings are saved and automatically applied on application restart.
 
+## Getting Started
 
-![1 0 0 4tray](https://github.com/7gxycn08/PyAutoActions/assets/121936658/8375da5c-210b-4633-b8cb-768e5c37cc54)
+1. **Add Games**: Use the GUI to add the executable path of your games.
+2. **Automatic HDR Management**: HDR will enable when a game starts and disable upon its closure.
+3. **Startup Option**: Enable running PyAutoActions at system boot via the tray icon context menu.
+4. **Enhanced Compatibility**: Use [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR) for AutoHDR in unsupported games.
+5. **Pre-Launch HDR Activation**: Launch games from the system tray to ensure HDR is enabled beforehand when games require HDR to be enabled before launch.
 
+## Latest Changes
 
-# Detection:
-1. **Contains three settings `High`, `Meduim`, `Low`. Default Is `High`.**
-2. **Using `Medium` or `Low` will speed up the switching state of HDR when a game Is launched.**
-3. **User settings will be saved and loaded automatically upon application relaunch.**
+- Dynamic HDR toggling for added/removed games without restarting.
+- Implementation of a ctypes method to check the global HDR state.
+- Enhanced method for enabling/disabling HDR dynamically.
 
-# Usage:
-1. **Add `Game` exe path using button.**
+## Contributing
 
+Your contributions make PyAutoActions better! We welcome pull requests, feature requests, and any other contributions. If you're looking to add new features or improve existing ones, please feel free to contribute.
 
-2. **Run `Game` and hdr will automatically be enabled at start and disabled when you close the game.**
+## TODO
 
+- Explore additional functionalities.
+- Encourage community contributions and feature requests.
 
-3. **To run `PyAutoActions` at startup right-click tray icon and enable `Run on System Boot`.**
-
-
-4. **To enable `AutoHDR` for unsupported games you can use [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR)**
-
-
-5. **To address the issue of games requiring HDR to be enabled `before launch`<br> a `Game launcher` from `system tray` have been implemented.**
-
-
-6. **When using [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR) to force windows auto hdr,<br> system hdr is required to be enabled before game start. Launching the game from system tray Is required.**
-
-
-# Latest Changes:
-- **HDR will now enable or disable on the fly when game is added or removed while running.**
-- **Added low level method that gets current global hdr state.**
-- **HDR Is enabled or disabled dynamically now via the new method.**
-
-
-# TODO:
-1. **Looking forward to adding extra functionality.**
-2. **Pull requests are welcome.**
-3. **Feature requests are welcome.**
