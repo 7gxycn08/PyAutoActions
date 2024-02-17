@@ -16,7 +16,7 @@ PyAutoActions automates HDR management for your games and applications, enabling
 
 ## Detection Settings
 
-- **Adjustable**: Choose from `High`, `Medium`, or `Low` for adjusting the speed of HDR switching. Low is the fastest at the expence of extra cpu usage.
+- **Adjustable**: Choose from `High`, `Medium`, or `Low` for adjusting the speed of HDR switching. `Low` is the fastest at the expence of extra cpu usage default is `High`.
 - **User Preferences**: Settings are saved and automatically applied on application restart.
 
 ## Getting Started
