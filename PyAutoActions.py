@@ -52,7 +52,6 @@ class ProcessMonitor(QWidget):
         self.uid = int(uuid.uuid4())
         self.toggle_state = self.is_hdr_running(ctypes.c_uint32(self.uid))
 
-
     def check_hdr_state(self):
         self.toggle_state = self.is_hdr_running(ctypes.c_uint32(self.uid))
 
@@ -192,13 +191,13 @@ class MainWindow(QMainWindow):
         self.monitor_thread = None
         self.boot_status = None
         self.script_path = f"{os.path.abspath(sys.argv[0])}"
-        self.task_name = "PyAutoActions"
         self.config = configparser.ConfigParser()
-        self.config.read(r'Dependency\processlist.ini')
+        self.load_or_create_config()
+        self.config.read(self.get_appdata_path("processlist.ini"))
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.setWindowTitle("PyAutoActions v1.0.1.2")
+        self.setWindowTitle("PyAutoActions v1.0.1.3")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources/main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -285,7 +284,10 @@ class MainWindow(QMainWindow):
 
         self.run_on_boot_action = QAction('Run on System Boot', self.menu)
         self.run_on_boot_action.setCheckable(True)
-        self.run_on_boot_action.setChecked(self.settings.value("run_on_boot", type=bool))
+        if self.already_added_shortcut():
+            self.run_on_boot_action.setChecked(True)
+        else:
+            self.run_on_boot_action.setChecked(False)
         self.run_on_boot_action.triggered.connect(self.run_on_boot)
 
         self.about_button = QAction(QIcon(r"Resources\about.ico"), 'About')
@@ -357,7 +359,9 @@ class MainWindow(QMainWindow):
         DIB_RGB_COLORS = 0
 
         icon_handle = self.extract_icon(file_path, icon_index)
-        if icon_handle:
+        if icon_handle is None:
+            return
+        elif icon_handle:
             hdc = ctypes.windll.user32.GetDC(0)
             mem_dc = ctypes.windll.gdi32.CreateCompatibleDC(hdc)
             bitmap = ctypes.windll.gdi32.CreateCompatibleBitmap(hdc, self.ICON_SIZE, self.ICON_SIZE)
@@ -395,20 +399,24 @@ class MainWindow(QMainWindow):
             self.warning_signal.emit()
             return None
 
-    def resize_pixmap(self, pixmap, width, height):
+    @staticmethod
+    def resize_pixmap(pixmap, width, height):
         new_size = QSize(width, height)
         return pixmap.scaled(new_size, Qt.AspectRatioMode.KeepAspectRatio,
                              Qt.TransformationMode.SmoothTransformation)
 
     def pil_image_to_qicon(self, image_object):
-        byte_array = io.BytesIO()
-        image_object.save(byte_array, format='PNG')
-        qimage = QImage()
-        qimage.loadFromData(byte_array.getvalue())
+        if image_object is None:
+            return QIcon(r"Resources\game.png")
+        else:
+            byte_array = io.BytesIO()
+            image_object.save(byte_array, format='PNG')
+            qimage = QImage()
+            qimage.loadFromData(byte_array.getvalue())
 
-        qpixmap = QPixmap.fromImage(qimage)
-        resized_pixmap = self.resize_pixmap(qpixmap, 32, 32)
-        return QIcon(resized_pixmap)
+            qpixmap = QPixmap.fromImage(qimage)
+            resized_pixmap = self.resize_pixmap(qpixmap, 32, 32)
+            return QIcon(resized_pixmap)
 
     def delete_submenu_action(self, index):
         if self.submenu.actions():
@@ -459,6 +467,8 @@ class MainWindow(QMainWindow):
             self.monitor.manual_hdr = True
             self.monitor.count = True
             self.monitor.call_set_global_hdr_state()
+            subprocess.run(path, cwd=os.path.dirname(path), shell=True, check=True)
+        except subprocess.CalledProcessError:
             threading.Thread(target=lambda: self.run_as_admin(path), daemon=True).start()
         except Exception as e:
             self.exception_msg = f"on_action_triggered: {e}"
@@ -470,85 +480,74 @@ class MainWindow(QMainWindow):
     def run_on_boot(self):
         checked = self.run_on_boot_action.isChecked()
         self.settings.setValue("run_on_boot", checked)
-        state = self.settings.value("run_on_boot", type=bool)
-        if state:
-            self.register_as_task()
+        state = self.already_added_shortcut()
+        if not state:
+            self.add_to_startup()
         else:
-            self.remove_task()
+            self.remove_start_shortcut()
 
-    def remove_task(self):
-        if self.is_task_installed():
+    def remove_start_shortcut(self):
+        if self.already_added_shortcut():
             try:
-                scheduler = win32com.client.Dispatch('Schedule.Service')
-                scheduler.Connect()
+                exe_name = "PyAutoActions"
+                shortcut_name = exe_name + '.lnk'
 
-                root_folder = scheduler.GetFolder('\\')
-                task = root_folder.GetTask(self.task_name)
+                shell = win32com.client.Dispatch("WScript.Shell")
+                startup_folder = shell.SpecialFolders("Startup")
+                shortcut_path = os.path.join(startup_folder, shortcut_name)
 
-                root_folder.DeleteTask(self.task_name, 0)
+                if os.path.exists(shortcut_path):
+                    os.remove(shortcut_path)
 
             except Exception as e:
-                self.exception_msg = f"remove_task: {e}"
+                self.exception_msg = f"remove_start_shortcut: {e}"
                 self.warning_signal.emit()
 
     def toggle_start_hidden(self):
         checked = self.start_hidden_action.isChecked()
         self.settings.setValue("start_hidden", checked)
 
-    def is_task_installed(self):
+    def already_added_shortcut(self):
         try:
-            scheduler = win32com.client.Dispatch('Schedule.Service')
-            scheduler.Connect()
+            exe_name = "PyAutoActions"
+            shortcut_name = exe_name + '.lnk'
 
-            root_folder = scheduler.GetFolder('\\')
+            shell = win32com.client.Dispatch("WScript.Shell")
+            startup_folder = shell.SpecialFolders("Startup")
+            shortcut_path = os.path.join(startup_folder, shortcut_name)
 
-            try:
-                task = root_folder.GetTask(self.task_name)
+            if os.path.exists(shortcut_path):
                 return True
-            except:
+            else:
                 return False
         except Exception as e:
-            self.exception_msg = f"is_task_installed: {e}"
+            self.exception_msg = f"already_added_shortcut: {e}"
             self.warning_signal.emit()
 
-    def register_as_task(self):
-        if not self.is_task_installed():
+    def add_to_startup(self):
+        if not self.already_added_shortcut():
             try:
-                scheduler = win32com.client.Dispatch('Schedule.Service')
-                scheduler.Connect()
+                executable_name = "PyAutoActions.exe"
+                icon_path = fr"{os.getcwd()}\Resources\main.ico"
 
-                rootFolder = scheduler.GetFolder('\\')
+                current_path = os.path.join(os.getcwd(), executable_name)
 
-                taskDef = scheduler.NewTask(0)
-                taskDef.RegistrationInfo.Description = 'Start PyAutoActions at Boot'
+                shell = win32com.client.Dispatch("WScript.Shell")
+                startup_folder = shell.SpecialFolders("Startup")
+                shortcut_path = os.path.join(startup_folder, executable_name.replace('.exe', '.lnk'))
 
-                trigger = taskDef.Triggers.Create(9)
-                trigger.Id = 'LogonTriggerId'
+                shortcut = shell.CreateShortcut(shortcut_path)
+                shortcut.TargetPath = current_path
+                shortcut.WorkingDirectory = os.getcwd()
+                shortcut.IconLocation = icon_path
+                shortcut.save()
 
-                execAction = taskDef.Actions.Create(0)
-                execAction.Path = self.script_path
-                execAction.WorkingDirectory = os.getcwd()
-
-                principal = taskDef.Principal
-                principal.UserId = os.getlogin()
-                principal.RunLevel = 1
-                principal.LogonType = 3
-
-                taskDef.Settings.ExecutionTimeLimit = 'PT0S'
-
-                rootFolder.RegisterTaskDefinition(
-                    self.task_name,
-                    taskDef,
-                    6,
-                    None,
-                    None,
-                    3
-                )
             except Exception as e:
-                self.exception_msg = f"register_as_task: {e}"
+                self.exception_msg = f"add_to_startup: {e}"
                 self.warning_signal.emit()
 
-    def about_page(self):
+    @staticmethod
+    def about_page():
         subprocess.Popen("start https://github.com/7gxycn08/PyAutoActions",
                          shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
 
@@ -622,12 +621,38 @@ class MainWindow(QMainWindow):
             self.exception_msg = f"add_exe: {e}"
             self.warning_signal.emit()
 
+    def load_or_create_config(self):
+        config = self.config
+        config_path = self.get_appdata_path("processlist.ini")
+        try:
+            if not os.path.isfile(config_path):
+                with open(config_path, 'w') as configfile:
+                    config.add_section('HDR_APPS')
+                    config.set('HDR_APPS', 'processes', '')
+                    config.write(configfile)
+            else:
+                config.read(config_path)
+        except Exception as e:
+            self.exception_msg = f"load_or_create_config: {e}"
+            self.warning_signal.emit()
+
+    @staticmethod
+    def get_appdata_path(filename):
+        appdata_dir = os.environ['APPDATA']
+        app_dir = 'PyAutoActions'
+        full_path = os.path.join(appdata_dir, app_dir)
+
+        if not os.path.exists(full_path):
+            os.makedirs(full_path)
+
+        return os.path.join(full_path, filename)
+
     def save_config(self):
         try:
             self.list_str = ', '.join(self.process_list)
             self.config['HDR_APPS']['processes'] = self.list_str
-
-            with open(r'Dependency\processlist.ini', 'w') as configfile:
+            config_path = self.get_appdata_path('processlist.ini')
+            with open(config_path, 'w') as configfile:
                 self.config.write(configfile)
                 self.update_classes_variables()
         except Exception as e:
@@ -637,7 +662,7 @@ class MainWindow(QMainWindow):
     def load_processes_from_config(self):
         try:
             self.list_widget.clear()
-            self.config.read(r'Dependency\processlist.ini')
+            self.config.read(self.get_appdata_path("processlist.ini"))
             if 'HDR_APPS' in self.config and 'processes' in self.config['HDR_APPS']:
                 process_list_str = self.config['HDR_APPS']['processes']
                 processes = process_list_str.split(', ')
