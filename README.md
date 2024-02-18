@@ -29,9 +29,10 @@ PyAutoActions automates HDR management for your games and applications, enabling
 
 ## Latest Changes
 
-- Dynamic HDR toggling for added/removed games without restarting.
-- Implementation of a ctypes method to check the global HDR state.
-- Enhanced method for enabling/disabling HDR dynamically.
+- PyAutoActions now will run without requiring admin privileges.
+- Replaced task schedular with startup folder ".lnk" for starting at boot.
+- Game launcher will detect if a game requires admin and trigger uac automatically.
+- Bug fixes.
 
 ## Contributing
 
