@@ -442,7 +442,7 @@ class MainWindow(QMainWindow):
                         icon = self.pil_image_to_q_icon(image_object)
                         pixmap_icon = QIcon(icon)
                         new_action = QAction(pixmap_icon, base_name, self.menu)
-                        new_action.triggered.connect(lambda checked, p=item_text: self.on_action_triggered(p))
+                        new_action.triggered.connect(lambda: self.on_action_triggered(item_text))
                         self.submenu.addAction(new_action)
                         unique_items_set.add(item_text)
 
