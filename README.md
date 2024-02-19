@@ -29,10 +29,9 @@ PyAutoActions automates HDR management for your games and applications, enabling
 
 ## Latest Changes
 
-- PyAutoActions now will run without requiring admin privileges.
-- Replaced task schedular with startup folder ".lnk" for starting at boot.
-- Game launcher will detect if a game requires admin privileges and trigger uac automatically.
-- Bug fixes.
+- Replaced gui library PyQt6 with PySide6.
+- Fixed all code warnings and typos.
+- Code is more readable now.
 
 ## Contributing
 
