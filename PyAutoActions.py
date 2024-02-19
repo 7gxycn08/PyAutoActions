@@ -2,11 +2,11 @@ import time
 import threading
 import subprocess
 import winsound
-from PyQt6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget, QPushButton,
-                             QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout, QListWidgetItem,
-                             QSizePolicy)
-from PyQt6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup
-from PyQt6.QtCore import QCoreApplication, QSettings, pyqtSignal, Qt, QSize
+from PySide6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget,
+                               QPushButton, QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout,
+                               QListWidgetItem, QSizePolicy)
+from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup
+from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal
 import sys
 import os
 import configparser
@@ -18,7 +18,7 @@ import uuid
 
 
 class ProcessMonitor(QWidget):
-    finished = pyqtSignal()
+    finished = Signal()
 
     def __init__(self, process_list, use_alternative_hdr):
         super().__init__()
@@ -43,11 +43,11 @@ class ProcessMonitor(QWidget):
 
         self.hdr_switch = ctypes.CDLL(r"Dependency\HDRSwitch.dll")
         self.SetGlobalHDRState = self.hdr_switch.SetGlobalHDRState
-        self.SetGlobalHDRState.argtypes = [ctypes.c_bool]
+        self.SetGlobalHDRState.arg_types = [ctypes.c_bool]
         self.SetGlobalHDRState.restype = None
 
         self.is_hdr_running = self.hdr_switch.GetGlobalHDRState
-        self.is_hdr_running.argtypes = [ctypes.c_uint32]
+        self.is_hdr_running.arg_types = [ctypes.c_uint32]
         self.is_hdr_running.restype = ctypes.c_bool
         self.uid = int(uuid.uuid4())
         self.toggle_state = self.is_hdr_running(ctypes.c_uint32(self.uid))
@@ -106,8 +106,9 @@ class ProcessMonitor(QWidget):
             self.finished.emit()
             return
 
+    # noinspection PyTypeChecker
     def is_process_running(self, process_name):
-        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        process_query_limited_information = 0x1000
 
         try:
             processes = (ctypes.c_ulong * 2048)()
@@ -117,7 +118,7 @@ class ProcessMonitor(QWidget):
             process_count = cb.value // ctypes.sizeof(ctypes.c_ulong)
             for i in range(process_count):
                 process_id = processes[i]
-                process_handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False,
+                process_handle = ctypes.windll.kernel32.OpenProcess(process_query_limited_information, False,
                                                                     process_id)
 
                 if process_handle:
@@ -155,7 +156,7 @@ class ProcessMonitor(QWidget):
     def on_finished_show_msg(self):
         warning_message_box = QMessageBox()
         warning_message_box.setWindowTitle("PyAutoActions Error")
-        warning_message_box.setWindowIcon(QIcon("Resources/main.ico"))
+        warning_message_box.setWindowIcon(QIcon(r"Resources\main.ico"))
         warning_message_box.setFixedSize(400, 200)
         warning_message_box.setIcon(QMessageBox.Icon.Critical)
         warning_message_box.setText(f"{self.exception_msg}")
@@ -163,7 +164,7 @@ class ProcessMonitor(QWidget):
         warning_message_box.exec()
 
 
-class BITMAPINFOHEADER(ctypes.Structure):
+class BitMapInfoHeaders(ctypes.Structure):
     _fields_ = [("biSize", ctypes.c_uint),
                 ("biWidth", ctypes.c_int),
                 ("biHeight", ctypes.c_int),
@@ -171,14 +172,14 @@ class BITMAPINFOHEADER(ctypes.Structure):
                 ("biBitCount", ctypes.c_ushort),
                 ("biCompression", ctypes.c_uint),
                 ("biSizeImage", ctypes.c_uint),
-                ("biXPelsPerMeter", ctypes.c_int),
-                ("biYPelsPerMeter", ctypes.c_int),
+                ("biXPixelsPerMeter", ctypes.c_int),
+                ("biYPixelsPerMeter", ctypes.c_int),
                 ("biClrUsed", ctypes.c_uint),
                 ("biClrImportant", ctypes.c_uint)]
 
 
 class MainWindow(QMainWindow):
-    warning_signal = pyqtSignal()
+    warning_signal = Signal()
 
     def __init__(self):
         super().__init__()
@@ -197,8 +198,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.setWindowTitle("PyAutoActions v1.0.1.3")
-        self.setWindowIcon(QIcon(os.path.abspath(r"Resources/main.ico")))
+        self.setWindowTitle("PyAutoActions v1.0.1.4")
+        self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
         self.menu_bar = self.menuBar()
@@ -262,7 +263,7 @@ class MainWindow(QMainWindow):
         self.remove_button.clicked.connect(self.remove_selected_entry)
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setToolTip("PyAutoActions")
-        self.tray_icon.setIcon(QIcon(os.path.abspath(r"Resources/main.ico")))
+        self.tray_icon.setIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.tray_icon.activated.connect(self.tray_icon_activated)
 
         self.menu = QMenu()
@@ -273,7 +274,7 @@ class MainWindow(QMainWindow):
         self.submenu = QMenu('Game Launcher', self.menu)
         self.submenu.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.submenu.setWindowFlags(self.menu.windowFlags() | Qt.WindowType.FramelessWindowHint)
-        self.submenu.setIcon(QIcon(r"Resources/main.ico"))
+        self.submenu.setIcon(QIcon(r"Resources\main.ico"))
         self.menu.addMenu(self.submenu)
         self.menu.addSeparator()
 
@@ -336,7 +337,7 @@ class MainWindow(QMainWindow):
         warning_message_box = QMessageBox(self)
         warning_message_box.setIcon(QMessageBox.Icon.Warning)
         warning_message_box.setWindowTitle("PyAutoActions Error")
-        warning_message_box.setWindowIcon(QIcon(r"Resources/main.ico"))
+        warning_message_box.setWindowIcon(QIcon(r"Resources\main.ico"))
         warning_message_box.setFixedSize(400, 200)
         warning_message_box.setText(f"{self.exception_msg}")
         winsound.MessageBeep()
@@ -355,10 +356,8 @@ class MainWindow(QMainWindow):
         return icon_handle
 
     def get_icon_as_image_object(self, file_path, icon_index=0):
-        BI_RGB = 0
-        DIB_RGB_COLORS = 0
-
         icon_handle = self.extract_icon(file_path, icon_index)
+
         if icon_handle is None:
             return
         elif icon_handle:
@@ -371,17 +370,17 @@ class MainWindow(QMainWindow):
                 mem_dc, 0, 0, icon_handle, self.ICON_SIZE, self.ICON_SIZE, 0, None, 0x0003 | 0x0008
             )
 
-            bmp_header = BITMAPINFOHEADER()
-            bmp_header.biSize = ctypes.sizeof(BITMAPINFOHEADER)
+            bmp_header = BitMapInfoHeaders()
+            bmp_header.biSize = ctypes.sizeof(BitMapInfoHeaders)
             bmp_header.biWidth = self.ICON_SIZE
             bmp_header.biHeight = -self.ICON_SIZE
             bmp_header.biPlanes = 1
             bmp_header.biBitCount = 32
-            bmp_header.biCompression = BI_RGB
+            bmp_header.biCompression = 0
 
             bmp_str = ctypes.create_string_buffer(self.ICON_SIZE * self.ICON_SIZE * 4)
             ctypes.windll.gdi32.GetDIBits(mem_dc, bitmap, 0, self.ICON_SIZE, bmp_str, ctypes.byref(bmp_header),
-                                          DIB_RGB_COLORS)
+                                          0)
 
             im = Image.frombuffer(
                 'RGBA',
@@ -405,17 +404,17 @@ class MainWindow(QMainWindow):
         return pixmap.scaled(new_size, Qt.AspectRatioMode.KeepAspectRatio,
                              Qt.TransformationMode.SmoothTransformation)
 
-    def pil_image_to_qicon(self, image_object):
+    def pil_image_to_q_icon(self, image_object):
         if image_object is None:
             return QIcon(r"Resources\game.png")
         else:
             byte_array = io.BytesIO()
             image_object.save(byte_array, format='PNG')
-            qimage = QImage()
-            qimage.loadFromData(byte_array.getvalue())
+            q_image = QImage()
+            q_image.loadFromData(byte_array.getvalue())
 
-            qpixmap = QPixmap.fromImage(qimage)
-            resized_pixmap = self.resize_pixmap(qpixmap, 32, 32)
+            q_pixmap = QPixmap.fromImage(q_image)
+            resized_pixmap = self.resize_pixmap(q_pixmap, 32, 32)
             return QIcon(resized_pixmap)
 
     def delete_submenu_action(self, index):
@@ -440,7 +439,7 @@ class MainWindow(QMainWindow):
                     if item_text not in unique_items_set:
                         base_name = os.path.basename(item_text).rstrip(".exe")
                         image_object = self.get_icon_as_image_object(item_text)
-                        icon = self.pil_image_to_qicon(image_object)
+                        icon = self.pil_image_to_q_icon(image_object)
                         pixmap_icon = QIcon(icon)
                         new_action = QAction(pixmap_icon, base_name, self.menu)
                         new_action.triggered.connect(lambda checked, p=item_text: self.on_action_triggered(p))
@@ -608,7 +607,7 @@ class MainWindow(QMainWindow):
 
                 else:
                     icon = self.get_icon_as_image_object(exe_path)
-                    q_icon = self.pil_image_to_qicon(icon)
+                    q_icon = self.pil_image_to_q_icon(icon)
                     list_item = QListWidgetItem()
                     list_item.setIcon(q_icon)
                     list_item.setText(exe_path)
@@ -669,7 +668,7 @@ class MainWindow(QMainWindow):
                 for process in processes:
                     if process:
                         icon = self.get_icon_as_image_object(process)
-                        q_icon = self.pil_image_to_qicon(icon)
+                        q_icon = self.pil_image_to_q_icon(icon)
                         list_item = QListWidgetItem()
                         list_item.setIcon(q_icon)
                         list_item.setText(process)
