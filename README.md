@@ -29,9 +29,8 @@ PyAutoActions automates HDR management for your games and applications, enabling
 
 ## Latest Changes
 
-- Replaced gui library PyQt6 with PySide6.
-- Fixed all code warnings and typos.
-- Code is more readable now.
+- Fixed game launcher bug which overwrites old game paths with new ones.
+  
 
 ## Contributing
 
