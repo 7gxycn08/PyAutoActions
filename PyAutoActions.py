@@ -198,7 +198,7 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.setWindowTitle("PyAutoActions v1.1.5")
+        self.setWindowTitle("PyAutoActions v1.1.7")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -470,7 +470,8 @@ class MainWindow(QMainWindow):
             self.monitor.manual_hdr = True
             self.monitor.count = True
             self.monitor.call_set_global_hdr_state()
-            subprocess.run(path, cwd=os.path.dirname(path), shell=True, check=True)
+            (threading.Thread(target=lambda: subprocess.run(path, cwd=os.path.dirname(path), shell=True, check=True))
+             .start())
         except subprocess.CalledProcessError:
             threading.Thread(target=lambda: self.run_as_admin(path), daemon=True).start()
         except Exception as e:
