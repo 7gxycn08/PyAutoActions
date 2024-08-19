@@ -20,6 +20,11 @@ PyAutoActions automates HDR management for your games and applications, enabling
 - **Adjustable**: Choose from `High`, `Medium`, or `Low` for adjusting the speed of HDR switching. `Low` is the fastest at the expence of extra cpu usage default is `High`.
 - **User Preferences**: Settings are saved and automatically applied on application restart.
 
+## Toggle Mode Settings
+
+- **`SDR To HDR`: Will `enable` HDR at game start and `disable` HDR when the game closes.**
+- **`HDR To SDR`: Will `disable` HDR at game start and `enable` HDR when the game closes.**
+
 ## Getting Started
 
 1. **Add Games**: Use the GUI to add the executable path of your games.
@@ -30,7 +35,7 @@ PyAutoActions automates HDR management for your games and applications, enabling
 
 ## Latest Changes
 
-- Fixed game launcher bug which overwrites old game paths with new ones.
+- Fixed high CPU usage at start when Installing PyAutoActions for the first time.
   
 
 ## Contributing
