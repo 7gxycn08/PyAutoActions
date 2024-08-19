@@ -20,9 +20,10 @@ import uuid
 class ProcessMonitor(QWidget):
     finished = Signal()
 
-    def __init__(self, process_list, use_alternative_hdr):
+    def __init__(self, process_list):
         super().__init__()
         self.delay = None
+        self.reverse_toggle = None
         self.count = None
         self.shutting_down = False
         self.manual_hdr = None
@@ -35,7 +36,6 @@ class ProcessMonitor(QWidget):
         self.enable_hdr_thread = None
         self.disable_hdr_thread = None
 
-        self.use_alternative_hdr = use_alternative_hdr
         self.process_list = process_list
 
         self.found_process = False
@@ -58,20 +58,24 @@ class ProcessMonitor(QWidget):
     def process_monitor(self):
         while not self.shutting_down:
             try:
-                if self.manual_hdr and self.count:
-                    time.sleep(20)
-                    self.count = False
+                if self.manual_hdr:
+                    time.sleep(1)
+                    self.manual_hdr = False
 
                 if not self.found_process:
                     self.process_thread = threading.Thread(target=self.process_check, daemon=True)
                     self.process_thread.start()
                 else:
                     self.check_hdr_state()
-                    if self.toggle_state and not self.is_process_running(self.main_process):
+                    if not self.is_process_running(self.main_process):
                         self.found_process = False
                         self.manual_hdr = False
-                        self.call_set_global_hdr_state()
+                        if self.reverse_toggle == "HDR To SDR":
+                            self.toggle_hdr(True)  # Enable HDR when process exits
+                        else:
+                            self.toggle_hdr(False)  # Disable HDR when process exits if "SDR To HDR"
 
+                # Add delay based on self.delay value
                 if self.delay == "High":
                     time.sleep(5)
                 elif self.delay == "Medium":
@@ -91,13 +95,15 @@ class ProcessMonitor(QWidget):
             for process in self.process_list:
                 if self.is_process_running(os.path.basename(process)):
                     self.check_hdr_state()
-                    if not self.toggle_state:
+                    if self.reverse_toggle == "SDR To HDR" and not self.toggle_state:
                         self.found_process = True
                         self.main_process = os.path.basename(process)
-                        self.enable_hdr_thread = threading.Thread(
-                            target=self.call_set_global_hdr_state, daemon=True)
-                        self.enable_hdr_thread.start()
-                        self.enable_hdr_thread.join()
+                        self.toggle_hdr(True)  # Enable HDR at process launch
+                        break
+                    elif self.reverse_toggle == "HDR To SDR" and self.toggle_state:
+                        self.found_process = True
+                        self.main_process = os.path.basename(process)
+                        self.toggle_hdr(False)  # Disable HDR at process launch
                         break
 
         except Exception as e:
@@ -105,6 +111,13 @@ class ProcessMonitor(QWidget):
             self.exception_msg = f"process_check: {e}"
             self.finished.emit()
             return
+
+    def toggle_hdr(self, enable):
+        try:
+            self.SetGlobalHDRState(enable)
+        except Exception as e:
+            self.exception_msg = f"toggle_hdr: {e}"
+            self.finished.emit()
 
     # noinspection PyTypeChecker
     def is_process_running(self, process_name):
@@ -141,17 +154,18 @@ class ProcessMonitor(QWidget):
             return False
 
     def call_set_global_hdr_state(self):
-        try:
-            self.check_hdr_state()
-            if self.toggle_state:
-                state = False
-                self.SetGlobalHDRState(state)
-            elif not self.toggle_state:
-                state = True
-                self.SetGlobalHDRState(state)
-        except Exception as e:
-            self.exception_msg = f"call_set_global_hdr_state: {e}"
-            self.finished.emit()
+        self.check_hdr_state()
+
+        if self.reverse_toggle == "SDR To HDR":
+            if self.toggle_state:  # HDR is currently enabled
+                self.toggle_hdr(False)  # Disable HDR when process exits
+            else:
+                self.toggle_hdr(True)  # Enable HDR at process launch
+        elif self.reverse_toggle == "HDR To SDR":
+            if self.toggle_state:  # HDR is currently enabled
+                self.toggle_hdr(False)  # Disable HDR at process launch
+            else:
+                self.toggle_hdr(True)  # Enable HDR when process exits
 
     def on_finished_show_msg(self):
         warning_message_box = QMessageBox()
@@ -188,7 +202,6 @@ class MainWindow(QMainWindow):
         self.exception_msg = None
         self.ICON_SIZE = 64
         self.action_names = []
-        self.use_alternative_hdr = None
         self.monitor_thread = None
         self.boot_status = None
         self.script_path = f"{os.path.abspath(sys.argv[0])}"
@@ -198,7 +211,7 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.setWindowTitle("PyAutoActions v1.1.7")
+        self.setWindowTitle("PyAutoActions v1.1.8")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -225,6 +238,17 @@ class MainWindow(QMainWindow):
 
         self.delay_menu.addActions([self.low_delay, self.medium_delay, self.high_delay])
 
+        self.reverse_toggle_menu = self.menu_bar.addMenu('Toggle Mode')
+
+        self.sdr2hdr = QAction('SDR To HDR', self.reverse_toggle_menu)
+        self.sdr2hdr.setCheckable(True)
+        self.sdr2hdr.triggered.connect(lambda: self.update_reverse("SDR To HDR"))
+
+        self.hdr2sdr = QAction('HDR To SDR', self.reverse_toggle_menu)
+        self.hdr2sdr.setCheckable(True)
+        self.hdr2sdr.triggered.connect(lambda: self.update_reverse("HDR To SDR"))
+        self.reverse_toggle_menu.addActions([self.sdr2hdr, self.hdr2sdr])
+
         self.action_group = QActionGroup(self)
         self.action_group.addAction(self.low_delay)
         self.action_group.addAction(self.medium_delay)
@@ -232,6 +256,13 @@ class MainWindow(QMainWindow):
         self.action_group.setExclusive(True)
         self.restore_group_settings()
         self.action_group.triggered.connect(self.save_group_settings)
+
+        self.action_group_2 = QActionGroup(self)
+        self.action_group_2.addAction(self.sdr2hdr)
+        self.action_group_2.addAction(self.hdr2sdr)
+        self.action_group_2.setExclusive(True)
+        self.restore_group_settings_2()
+        self.action_group_2.triggered.connect(self.save_group_settings_2)
 
         self.central_widget = QWidget(self)
         self.setCentralWidget(self.central_widget)
@@ -298,16 +329,19 @@ class MainWindow(QMainWindow):
         self.action_exit.triggered.connect(self.close_tray_icon)
 
         self.menu.addActions([self.start_hidden_action, self.run_on_boot_action, self.about_button, self.action_exit])
-        self.start_hidden_checked = self.settings.value("start_hidden", type=bool)
+        self.start_hidden_checked = self.settings.value("start_hidden", defaultValue=False, type=bool)
         self.start_hidden_action.setChecked(self.start_hidden_checked)
         self.tray_icon.setContextMenu(self.menu)
         self.start_hidden_check()
         self.tray_icon.show()
-        self.monitor = ProcessMonitor(self.process_list, self.use_alternative_hdr)
+        self.monitor = ProcessMonitor(self.process_list)
         self.monitor_thread = threading.Thread(target=self.monitor.process_monitor)
         self.monitor_thread.start()
-        delay = self.settings.value("GroupSettings")
+        delay = self.settings.value("GroupSettings", defaultValue="High")
+        mode = self.settings.value("GroupSettings2", defaultValue="SDR To HDR")
         self.update_delay(delay)
+        self.update_reverse(mode)
+        self.monitor.delay = delay  # Update process monitor so it stays in sync upon restarts.
         self.load_processes_from_config()
         self.create_actions()
 
@@ -317,9 +351,22 @@ class MainWindow(QMainWindow):
                 self.settings.setValue("GroupSettings", action.text())
                 break
 
+    def save_group_settings_2(self):
+        for action in self.action_group_2.actions():
+            if action.isChecked():
+                self.settings.setValue("GroupSettings2", action.text())
+                break
+
     def restore_group_settings(self):
         checked_action = self.settings.value("GroupSettings", "High")
         for action in self.action_group.actions():
+            if action.text() == checked_action:
+                action.setChecked(True)
+                break
+
+    def restore_group_settings_2(self):
+        checked_action = self.settings.value("GroupSettings2", "SDR To HDR")
+        for action in self.action_group_2.actions():
             if action.text() == checked_action:
                 action.setChecked(True)
                 break
@@ -332,6 +379,13 @@ class MainWindow(QMainWindow):
 
     def update_delay(self, delay):
         self.monitor.delay = delay
+
+    def update_reverse(self, status):
+        if status == "SDR To HDR":
+            self.monitor.SetGlobalHDRState(False)
+        else:
+            self.monitor.SetGlobalHDRState(True)
+        self.monitor.reverse_toggle = status
 
     def warning_box(self):
         warning_message_box = QMessageBox(self)
