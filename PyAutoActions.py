@@ -5,7 +5,7 @@ import winsound
 from PySide6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget,
                                QPushButton, QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout,
                                QListWidgetItem, QSizePolicy)
-from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup
+from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup, QCursor
 from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal
 import sys
 import os
@@ -24,17 +24,12 @@ class ProcessMonitor(QWidget):
         super().__init__()
         self.delay = None
         self.reverse_toggle = None
-        self.count = None
         self.shutting_down = False
         self.manual_hdr = None
-        self.process_check_status = None
         self.exception_msg = None
         self.finished.connect(self.on_finished_show_msg, Qt.ConnectionType.QueuedConnection)
 
-        self.error_thread = None
         self.process_thread = None
-        self.enable_hdr_thread = None
-        self.disable_hdr_thread = None
 
         self.process_list = process_list
 
@@ -59,7 +54,7 @@ class ProcessMonitor(QWidget):
         while not self.shutting_down:
             try:
                 if self.manual_hdr:
-                    time.sleep(1)
+                    time.sleep(20)
                     self.manual_hdr = False
 
                 if not self.found_process:
@@ -211,7 +206,7 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.setWindowTitle("PyAutoActions v1.1.8")
+        self.setWindowTitle("PyAutoActions v1.1.9")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -292,15 +287,16 @@ class MainWindow(QMainWindow):
 
         self.add_button.clicked.connect(self.add_exe)
         self.remove_button.clicked.connect(self.remove_selected_entry)
-        self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setToolTip("PyAutoActions")
-        self.tray_icon.setIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
-        self.tray_icon.activated.connect(self.tray_icon_activated)
-
         self.menu = QMenu()
         self.menu.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.menu.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.menu.setWindowFlags(self.menu.windowFlags() | Qt.WindowType.FramelessWindowHint)
+
+        self.menu.installEventFilter(self)
+        self.tray_icon = QSystemTrayIcon(self)
+        self.tray_icon.setToolTip("PyAutoActions")
+        self.tray_icon.setIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
+        self.tray_icon.activated.connect(self.tray_icon_activated)
 
         self.submenu = QMenu('Game Launcher', self.menu)
         self.submenu.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
@@ -344,6 +340,11 @@ class MainWindow(QMainWindow):
         self.monitor.delay = delay  # Update process monitor so it stays in sync upon restarts.
         self.load_processes_from_config()
         self.create_actions()
+
+    def eventFilter(self, obj, event):
+        if obj is self.menu and event.type() == event.Type.WindowDeactivate:
+            self.menu.hide()  # Hide the menu when the window is deactivated
+        return super().eventFilter(obj, event)
 
     def save_group_settings(self):
         for action in self.action_group.actions():
@@ -616,6 +617,8 @@ class MainWindow(QMainWindow):
     def tray_icon_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
             self.show_window()
+        elif reason == QSystemTrayIcon.ActivationReason.Context:
+            self.menu.exec(QCursor.pos())
 
     def close_tray_icon(self):
         self.monitor.shutting_down = True
