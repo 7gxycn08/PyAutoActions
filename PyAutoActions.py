@@ -5,8 +5,8 @@ import winsound
 from PySide6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget,
                                QPushButton, QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout,
                                QListWidgetItem, QSizePolicy)
-from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup, QCursor
-from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal
+from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup, QCursor, QMouseEvent
+from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QObject, QEvent
 import sys
 import os
 import configparser
@@ -187,6 +187,17 @@ class BitMapInfoHeaders(ctypes.Structure):
                 ("biClrImportant", ctypes.c_uint)]
 
 
+class RightClickFilter(QObject):
+    def eventFilter(self, source, event):
+        if isinstance(event, QMouseEvent):
+            if event.type() == QEvent.Type.MouseButtonPress:
+                if event.button() == Qt.MouseButton.RightButton:
+                    return True  # Ignore single right-click event
+            elif event.type() == QEvent.Type.MouseButtonDblClick:
+                if event.button() == Qt.MouseButton.RightButton:
+                    return True  # Ignore double right-click event
+        return super().eventFilter(source, event)
+
 class MainWindow(QMainWindow):
     warning_signal = Signal()
 
@@ -206,7 +217,7 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.setWindowTitle("PyAutoActions v1.1.9")
+        self.setWindowTitle("PyAutoActions v1.2.0")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -292,7 +303,7 @@ class MainWindow(QMainWindow):
         self.menu.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.menu.setWindowFlags(self.menu.windowFlags() | Qt.WindowType.FramelessWindowHint)
 
-        self.menu.installEventFilter(self)
+        self.menu.installEventFilter(RightClickFilter(self.menu))
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setToolTip("PyAutoActions")
         self.tray_icon.setIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
@@ -618,6 +629,7 @@ class MainWindow(QMainWindow):
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
             self.show_window()
         elif reason == QSystemTrayIcon.ActivationReason.Context:
+            time.sleep(0.2)
             self.menu.exec(QCursor.pos())
 
     def close_tray_icon(self):
