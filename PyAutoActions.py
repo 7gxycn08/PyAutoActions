@@ -1,7 +1,3 @@
-import time
-import threading
-import subprocess
-import winsound
 from PySide6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget,
                                QPushButton, QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout,
                                QListWidgetItem, QSizePolicy)
@@ -15,6 +11,11 @@ import win32com.client
 from PIL import Image
 import io
 import uuid
+import urllib.request
+import time
+import threading
+import subprocess
+import winsound
 
 
 class ProcessMonitor(QWidget):
@@ -196,16 +197,21 @@ class RightClickFilter(QObject):
             elif event.type() == QEvent.Type.MouseButtonDblClick:
                 if event.button() == Qt.MouseButton.RightButton:
                     return True  # Ignore double right-click event
+
         return super().eventFilter(source, event)
+
 
 class MainWindow(QMainWindow):
     warning_signal = Signal()
+    update_signal = Signal()
 
     def __init__(self):
         super().__init__()
         self.settings = QSettings("7gxycn08@Github", "PyAutoActions")
         self.warning_signal.connect(self.warning_box, Qt.ConnectionType.QueuedConnection)
+        self.update_signal.connect(self.update_box, Qt.ConnectionType.QueuedConnection)
         self.exception_msg = None
+        self.update_msg = None
         self.ICON_SIZE = 64
         self.action_names = []
         self.monitor_thread = None
@@ -217,17 +223,24 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.setWindowTitle("PyAutoActions v1.2.0")
+        self.current_version = 121 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.2.1")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
         self.menu_bar = self.menuBar()
         self.file_menu = self.menu_bar.addMenu('File')
-        self.about_in_menubar = QAction(QIcon(r"Resources\about.ico"), 'About', self)
-        self.about_in_menubar.triggered.connect(self.about_page)
-        self.exit_from_menubar = QAction(QIcon(r"Resources\exit.ico"), 'Exit Application', self)
-        self.exit_from_menubar.triggered.connect(self.close_tray_icon)
-        self.file_menu.addActions([self.about_in_menubar, self.exit_from_menubar])
+        self.check_for_update_action = QAction('Check for Update on Startup', self.file_menu)
+        self.check_for_update_action.setCheckable(True)
+        self.check_for_update_action.triggered.connect(self.save_update_settings)
+        self.file_menu.addSeparator()
+        self.about_in_menu_bar = QAction(QIcon(r"Resources\about.ico"), 'About', self)
+        self.about_in_menu_bar.triggered.connect(self.about_page)
+        self.exit_from_menu_bar = QAction(QIcon(r"Resources\exit.ico"), 'Exit Application', self)
+        self.exit_from_menu_bar.triggered.connect(self.close_tray_icon)
+        self.file_menu.addActions([self.check_for_update_action, self.about_in_menu_bar, self.exit_from_menu_bar])
+        update = self.settings.value("check_for_updates", defaultValue=True, type=bool)
+        self.check_for_update_action.setChecked(bool(update))
 
         self.delay_menu = self.menu_bar.addMenu('Detection')
         self.low_delay = QAction('Low', self.delay_menu)
@@ -299,11 +312,11 @@ class MainWindow(QMainWindow):
         self.add_button.clicked.connect(self.add_exe)
         self.remove_button.clicked.connect(self.remove_selected_entry)
         self.menu = QMenu()
+        self.menu.installEventFilter(RightClickFilter(self.menu))
         self.menu.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.menu.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.menu.setWindowFlags(self.menu.windowFlags() | Qt.WindowType.FramelessWindowHint)
 
-        self.menu.installEventFilter(RightClickFilter(self.menu))
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setToolTip("PyAutoActions")
         self.tray_icon.setIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
@@ -318,7 +331,7 @@ class MainWindow(QMainWindow):
 
         self.start_hidden_action = QAction('Start In Tray', self.menu)
         self.start_hidden_action.setCheckable(True)
-        self.start_hidden_action.setChecked(self.settings.value("start_hidden", type=bool))
+        self.start_hidden_action.setChecked(bool(self.settings.value("start_hidden", defaultValue=False, type=bool)))
         self.start_hidden_action.triggered.connect(self.toggle_start_hidden)
 
         self.run_on_boot_action = QAction('Run on System Boot', self.menu)
@@ -337,7 +350,7 @@ class MainWindow(QMainWindow):
 
         self.menu.addActions([self.start_hidden_action, self.run_on_boot_action, self.about_button, self.action_exit])
         self.start_hidden_checked = self.settings.value("start_hidden", defaultValue=False, type=bool)
-        self.start_hidden_action.setChecked(self.start_hidden_checked)
+        self.start_hidden_action.setChecked(bool(self.start_hidden_checked))
         self.tray_icon.setContextMenu(self.menu)
         self.start_hidden_check()
         self.tray_icon.show()
@@ -351,11 +364,40 @@ class MainWindow(QMainWindow):
         self.monitor.delay = delay  # Update process monitor so it stays in sync upon restarts.
         self.load_processes_from_config()
         self.create_actions()
+        if self.check_for_update_action.isChecked():
+            self.update_thread = threading.Thread(target=self.check_for_update)
+            self.update_thread.start()
 
-    def eventFilter(self, obj, event):
-        if obj is self.menu and event.type() == event.Type.WindowDeactivate:
-            self.menu.hide()  # Hide the menu when the window is deactivated
-        return super().eventFilter(obj, event)
+    def center_window(self):
+        screen = app.primaryScreen()
+        screen_geometry = screen.availableGeometry()
+        window_geometry = self.frameGeometry()
+        x = (screen_geometry.width() - window_geometry.width()) // 2
+        y = (screen_geometry.height() - window_geometry.height()) // 2
+        self.move(x, y)
+
+    def check_for_update(self):
+        update_url = "https://raw.githubusercontent.com/7gxycn08/PyAutoActions/main/current_version.txt"
+        try:
+            with urllib.request.urlopen(update_url) as response:
+                content = response.read().decode().strip()
+
+            number = int(content)
+            if self.current_version < number:
+                self.update_msg = f"PyAutoActions v{'.'.join(str(number))} Update Available."
+                self.update_signal.emit()
+
+        except Exception as e:
+            self.exception_msg = f"Check_For_Update Error: {e}"
+            self.warning_signal.emit()
+
+    def save_update_settings(self):
+        if self.check_for_update_action.isChecked():
+            self.settings.setValue("check_for_updates", True)
+            self.check_for_update()
+        else:
+            self.settings.setValue("check_for_updates", False)
+
 
     def save_group_settings(self):
         for action in self.action_group.actions():
@@ -387,6 +429,7 @@ class MainWindow(QMainWindow):
         if self.start_hidden_checked:
             self.hide()
         else:
+            self.center_window()
             self.show()
 
     def update_delay(self, delay):
@@ -407,7 +450,44 @@ class MainWindow(QMainWindow):
         warning_message_box.setFixedSize(400, 200)
         warning_message_box.setText(f"{self.exception_msg}")
         winsound.MessageBeep()
+        screen = app.primaryScreen()
+        screen_geometry = screen.availableGeometry()
+        x = (screen_geometry.width() - warning_message_box.width()) // 2
+        y = (screen_geometry.height() - warning_message_box.height()) // 2
+        warning_message_box.move(x, y)
         warning_message_box.exec()
+
+    def update_box(self):
+        update_message_box = QMessageBox(self)
+        update_message_box.setIcon(QMessageBox.Icon.Information)
+        update_message_box.setWindowTitle("PyAutoActions")
+        update_message_box.setWindowIcon(QIcon(r"Resources\main.ico"))
+        update_message_box.setFixedSize(400, 200)
+        update_message_box.setText(f"{self.update_msg}")
+        winsound.MessageBeep()
+        screen = app.primaryScreen()
+        screen_geometry = screen.availableGeometry()
+        x = (screen_geometry.width() - update_message_box.width()) // 2
+        y = (screen_geometry.height() - update_message_box.height()) // 2
+        update_message_box.move(x, y)
+        update_message_box.exec()
+
+    def exit_confirm_box(self):
+        exit_message_box = QMessageBox(self)
+        exit_message_box.setIcon(QMessageBox.Icon.Question)
+        exit_message_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        exit_message_box.setWindowTitle("PyAutoActions")
+        exit_message_box.setWindowIcon(QIcon(r"Resources\main.ico"))
+        exit_message_box.setFixedSize(400, 200)
+        exit_message_box.setText(f"Do you want to exit PyAutoActions?")
+        winsound.MessageBeep()
+        screen = app.primaryScreen()
+        screen_geometry = screen.availableGeometry()
+        x = (screen_geometry.width() - exit_message_box.width()) // 2
+        y = (screen_geometry.height() - exit_message_box.height()) // 2
+        exit_message_box.move(x, y)
+        result = exit_message_box.exec()
+        return result
 
     def extract_icon(self, file_path, icon_index=0):
         try:
@@ -621,22 +701,21 @@ class MainWindow(QMainWindow):
         subprocess.Popen("start https://github.com/7gxycn08/PyAutoActions",
                          shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
 
-    def closeEvent(self, event):
-        event.ignore()
-        self.hide()
-
     def tray_icon_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
             self.show_window()
         elif reason == QSystemTrayIcon.ActivationReason.Context:
-            time.sleep(0.2)
             self.menu.exec(QCursor.pos())
 
     def close_tray_icon(self):
-        self.monitor.shutting_down = True
-        QCoreApplication.quit()
+        if self.exit_confirm_box() == QMessageBox.StandardButton.Yes:
+            self.monitor.shutting_down = True
+            QCoreApplication.quit()
+        else:
+            pass
 
     def show_window(self):
+        self.center_window()
         self.show()
         self.activateWindow()
 
