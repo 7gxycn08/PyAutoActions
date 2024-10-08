@@ -1,3 +1,4 @@
+from typing import TextIO
 from PySide6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget,
                                QPushButton, QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout,
                                QListWidgetItem, QSizePolicy)
@@ -193,10 +194,12 @@ class RightClickFilter(QObject):
         if isinstance(event, QMouseEvent):
             if event.type() == QEvent.Type.MouseButtonPress:
                 if event.button() == Qt.MouseButton.RightButton:
-                    return True  # Ignore single right-click event
-            elif event.type() == QEvent.Type.MouseButtonDblClick:
+                    return True
+            if event.type() == QEvent.Type.MouseButtonDblClick:
                 if event.button() == Qt.MouseButton.RightButton:
-                    return True  # Ignore double right-click event
+                    return True
+            elif event.type() == QEvent.Type.MouseMove and event.buttons() & Qt.MouseButton.RightButton:
+                return True
 
         return super().eventFilter(source, event)
 
@@ -223,8 +226,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 121 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.2.1")
+        self.current_version = 122 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.2.2")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -321,6 +324,7 @@ class MainWindow(QMainWindow):
         self.tray_icon.setToolTip("PyAutoActions")
         self.tray_icon.setIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.tray_icon.activated.connect(self.tray_icon_activated)
+        self.tray_icon.setContextMenu(self.menu)
 
         self.submenu = QMenu('Game Launcher', self.menu)
         self.submenu.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
@@ -751,7 +755,8 @@ class MainWindow(QMainWindow):
     def add_exe(self):
         try:
             file_dialog = QFileDialog()
-            file_path, _ = file_dialog.getOpenFileName(self, "Select Executable", "", "Executable Files (*.exe)")
+            file_path, _ = file_dialog.getOpenFileName(self, "Select Executable", "",
+                                                       "Executable Files (*.exe)")
             if file_path:
                 exe_path = os.path.abspath(file_path)
                 if exe_path in self.process_list:
@@ -804,6 +809,7 @@ class MainWindow(QMainWindow):
             self.list_str = ', '.join(self.process_list)
             self.config['HDR_APPS']['processes'] = self.list_str
             config_path = self.get_appdata_path('processlist.ini')
+            configfile: TextIO
             with open(config_path, 'w') as configfile:
                 self.config.write(configfile)
                 self.update_classes_variables()
