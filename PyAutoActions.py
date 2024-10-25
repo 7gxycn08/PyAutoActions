@@ -19,7 +19,6 @@ import subprocess
 import winsound
 
 
-
 class ProcessMonitor(QWidget):
     finished = Signal()
 
@@ -214,7 +213,6 @@ class MainWindow(QMainWindow):
         self.settings = QSettings("7gxycn08@Github", "PyAutoActions")
         self.warning_signal.connect(self.warning_box, Qt.ConnectionType.QueuedConnection)
         self.update_signal.connect(self.update_box, Qt.ConnectionType.QueuedConnection)
-        self.user_ask_result = None
         self.exception_msg = None
         self.update_msg = None
         self.ICON_SIZE = 64
@@ -228,8 +226,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 123 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.2.3")
+        self.current_version = 122 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.2.2")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -622,8 +620,8 @@ class MainWindow(QMainWindow):
             self.monitor.manual_hdr = True
             self.monitor.count = True
             self.monitor.call_set_global_hdr_state()
-            (threading.Thread(target=lambda: subprocess.run(path, cwd=os.path.dirname(path), shell=True, check=True),
-                              daemon=True).start())
+            (threading.Thread(target=lambda: subprocess.run(path, cwd=os.path.dirname(path), shell=True, check=True))
+             .start())
         except subprocess.CalledProcessError:
             threading.Thread(target=lambda: self.run_as_admin(path), daemon=True).start()
         except Exception as e:
@@ -759,32 +757,6 @@ class MainWindow(QMainWindow):
             file_dialog = QFileDialog()
             file_path, _ = file_dialog.getOpenFileName(self, "Select Executable", "",
                                                        "Executable Files (*.exe)")
-            lnk_path = file_path.replace(".exe",".exe - shortcut.lnk")
-            lnk_exists = os.path.exists(lnk_path) and os.path.isfile(lnk_path) and lnk_path.lower().endswith('.lnk')
-            if lnk_exists:
-                ask_message_box = QMessageBox(self)
-                ask_message_box.setIcon(QMessageBox.Icon.Question)
-                ask_message_box.setWindowTitle("PyAutoActions")
-                ask_message_box.setWindowIcon(QIcon(r"Resources\main.ico"))
-                ask_message_box.setText("Do you want to add .lnk file?")
-                ask_message_box.setFixedSize(600, 200)
-                yes_button = ask_message_box.addButton(QMessageBox.StandardButton.Yes)
-                no_button = ask_message_box.addButton(QMessageBox.StandardButton.No)
-                winsound.MessageBeep()
-                screen = app.primaryScreen()
-                screen_geometry = screen.availableGeometry()
-                x = (screen_geometry.width() - ask_message_box.width()) // 2
-                y = (screen_geometry.height() - ask_message_box.height()) // 2
-                ask_message_box.move(x, y)
-                ask_message_box.exec()
-                if ask_message_box.clickedButton() == yes_button:
-                    self.user_ask_result = "Yes"
-                else:
-                    self.user_ask_result = "No"
-
-                if self.user_ask_result == "Yes":
-                    file_path = lnk_path
-
             if file_path:
                 exe_path = os.path.abspath(file_path)
                 if exe_path in self.process_list:
@@ -792,11 +764,7 @@ class MainWindow(QMainWindow):
                     self.warning_signal.emit()
 
                 else:
-                    if self.user_ask_result == "Yes" and lnk_exists:
-                        icon = self.get_icon_as_image_object(exe_path.replace(".exe - shortcut.lnk",
-                                                                              ".exe"))
-                    else:
-                        icon = self.get_icon_as_image_object(exe_path)
+                    icon = self.get_icon_as_image_object(exe_path)
                     q_icon = self.pil_image_to_q_icon(icon)
                     list_item = QListWidgetItem()
                     list_item.setIcon(q_icon)
