@@ -24,6 +24,7 @@ PyAutoActions automates HDR management for your games and applications, enabling
 
 - **`SDR To HDR`: Will `enable` HDR at game start and `disable` HDR when the game closes.**
 - **`HDR To SDR`: Will `disable` HDR at game start and `enable` HDR when the game closes.**
+- **`Respect Global Settings`: Will detect if system HDR is on or off at game start and and adjust accordingly.**
 
 ## Getting Started
 
