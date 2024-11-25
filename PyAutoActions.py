@@ -1,9 +1,8 @@
-from typing import TextIO
 from PySide6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget,
                                QPushButton, QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout,
                                QListWidgetItem, QSizePolicy)
 from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup, QCursor, QMouseEvent
-from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QObject, QEvent
+from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QObject, QEvent, QThread
 import sys
 import os
 import configparser
@@ -14,7 +13,6 @@ import io
 import uuid
 import urllib.request
 import time
-import threading
 import subprocess
 import winsound
 
@@ -31,7 +29,7 @@ class ProcessMonitor(QWidget):
         self.exception_msg = None
         self.finished.connect(self.on_finished_show_msg, Qt.ConnectionType.QueuedConnection)
 
-        self.process_thread = None
+        self.process_thread = QThread()
 
         self.process_list = process_list
 
@@ -60,7 +58,7 @@ class ProcessMonitor(QWidget):
                     self.manual_hdr = False
 
                 if not self.found_process:
-                    self.process_thread = threading.Thread(target=self.process_check, daemon=True)
+                    self.process_thread.run = self.process_check
                     self.process_thread.start()
                 else:
                     self.check_hdr_state()
@@ -102,6 +100,16 @@ class ProcessMonitor(QWidget):
                         self.main_process = os.path.basename(process)
                         self.toggle_hdr(False)  # Disable HDR at process launch
                         break
+                    elif self.reverse_toggle == "Always On" and not self.toggle_state:
+                        self.found_process = True
+                        self.main_process = os.path.basename(process)
+                        self.toggle_hdr(True)  # Enable HDR at process launch
+                        break
+                    elif self.reverse_toggle == "Always On" and self.toggle_state:
+                        self.found_process = True
+                        self.main_process = os.path.basename(process)
+                        # Enable HDR at process launch
+                        break
 
         except Exception as e:
             self.shutting_down = True
@@ -121,7 +129,7 @@ class ProcessMonitor(QWidget):
         process_query_limited_information = 0x1000
 
         try:
-            processes = (ctypes.c_ulong * 2048)()
+            processes = (ctypes.c_ulong * 2048)() # noqa
             cb = ctypes.c_ulong(ctypes.sizeof(processes))
             ctypes.windll.psapi.EnumProcesses(ctypes.byref(processes), cb, ctypes.byref(cb))
 
@@ -163,6 +171,12 @@ class ProcessMonitor(QWidget):
                 self.toggle_hdr(False)  # Disable HDR at process launch
             else:
                 self.toggle_hdr(True)  # Enable HDR when process exits
+        elif self.reverse_toggle == "Always On":
+            if self.toggle_state:
+                self.toggle_hdr(True)
+            else:
+                self.toggle_hdr(False)
+
 
     def on_finished_show_msg(self):
         warning_message_box = QMessageBox()
@@ -195,7 +209,7 @@ class RightClickFilter(QObject):
             if event.type() == QEvent.Type.MouseButtonPress:
                 if event.button() == Qt.MouseButton.RightButton:
                     return True
-            if event.type() == QEvent.Type.MouseButtonDblClick:
+            elif event.type() == QEvent.Type.MouseButtonDblClick:
                 if event.button() == Qt.MouseButton.RightButton:
                     return True
             elif event.type() == QEvent.Type.MouseMove and event.buttons() & Qt.MouseButton.RightButton:
@@ -213,12 +227,20 @@ class MainWindow(QMainWindow):
         self.settings = QSettings("7gxycn08@Github", "PyAutoActions")
         self.warning_signal.connect(self.warning_box, Qt.ConnectionType.QueuedConnection)
         self.update_signal.connect(self.update_box, Qt.ConnectionType.QueuedConnection)
+
         self.exception_msg = None
         self.update_msg = None
         self.ICON_SIZE = 64
         self.action_names = []
         self.monitor_thread = None
         self.boot_status = None
+
+        self.monitor_thread = QThread()
+        self.update_thread = QThread()
+        self.process_launch_thread = QThread()
+        self.run_as_admin_thread = QThread()
+        self.save_config_thread = QThread()
+
         self.script_path = f"{os.path.abspath(sys.argv[0])}"
         self.config = configparser.ConfigParser()
         self.load_or_create_config()
@@ -226,8 +248,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 122 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.2.2")
+        self.current_version = 123 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.2.3")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -236,12 +258,15 @@ class MainWindow(QMainWindow):
         self.check_for_update_action = QAction('Check for Update on Startup', self.file_menu)
         self.check_for_update_action.setCheckable(True)
         self.check_for_update_action.triggered.connect(self.save_update_settings)
+
         self.file_menu.addSeparator()
+
         self.about_in_menu_bar = QAction(QIcon(r"Resources\about.ico"), 'About', self)
         self.about_in_menu_bar.triggered.connect(self.about_page)
         self.exit_from_menu_bar = QAction(QIcon(r"Resources\exit.ico"), 'Exit Application', self)
         self.exit_from_menu_bar.triggered.connect(self.close_tray_icon)
         self.file_menu.addActions([self.check_for_update_action, self.about_in_menu_bar, self.exit_from_menu_bar])
+
         update = self.settings.value("check_for_updates", defaultValue=True, type=bool)
         self.check_for_update_action.setChecked(bool(update))
 
@@ -269,7 +294,12 @@ class MainWindow(QMainWindow):
         self.hdr2sdr = QAction('HDR To SDR', self.reverse_toggle_menu)
         self.hdr2sdr.setCheckable(True)
         self.hdr2sdr.triggered.connect(lambda: self.update_reverse("HDR To SDR"))
-        self.reverse_toggle_menu.addActions([self.sdr2hdr, self.hdr2sdr])
+
+        self.respect_global_hdr = QAction('Respect Global Settings', self.reverse_toggle_menu)
+        self.respect_global_hdr.setCheckable(True)
+        self.respect_global_hdr.triggered.connect(lambda: self.update_reverse("Always On"))
+
+        self.reverse_toggle_menu.addActions([self.sdr2hdr, self.hdr2sdr, self.respect_global_hdr])
 
         self.action_group = QActionGroup(self)
         self.action_group.addAction(self.low_delay)
@@ -282,6 +312,7 @@ class MainWindow(QMainWindow):
         self.action_group_2 = QActionGroup(self)
         self.action_group_2.addAction(self.sdr2hdr)
         self.action_group_2.addAction(self.hdr2sdr)
+        self.action_group_2.addAction(self.respect_global_hdr)
         self.action_group_2.setExclusive(True)
         self.restore_group_settings_2()
         self.action_group_2.triggered.connect(self.save_group_settings_2)
@@ -359,17 +390,21 @@ class MainWindow(QMainWindow):
         self.start_hidden_check()
         self.tray_icon.show()
         self.monitor = ProcessMonitor(self.process_list)
-        self.monitor_thread = threading.Thread(target=self.monitor.process_monitor)
+
+        self.monitor_thread.run = self.monitor.process_monitor
         self.monitor_thread.start()
+
         delay = self.settings.value("GroupSettings", defaultValue="High")
         mode = self.settings.value("GroupSettings2", defaultValue="SDR To HDR")
+
         self.update_delay(delay)
         self.update_reverse(mode)
         self.monitor.delay = delay  # Update process monitor so it stays in sync upon restarts.
         self.load_processes_from_config()
         self.create_actions()
+
         if self.check_for_update_action.isChecked():
-            self.update_thread = threading.Thread(target=self.check_for_update)
+            self.update_thread.run = self.check_for_update
             self.update_thread.start()
 
     def center_window(self):
@@ -388,7 +423,7 @@ class MainWindow(QMainWindow):
 
             number = int(content)
             if self.current_version < number:
-                self.update_msg = f"PyAutoActions v{'.'.join(str(number))} Update Available."
+                self.update_msg = f"PyAutoActions v{'.'.join(str(number))} Update Available.\n\n Open releases page?"
                 self.update_signal.emit()
 
         except Exception as e:
@@ -442,8 +477,10 @@ class MainWindow(QMainWindow):
     def update_reverse(self, status):
         if status == "SDR To HDR":
             self.monitor.SetGlobalHDRState(False)
-        else:
+        elif status == "HDR To SDR":
             self.monitor.SetGlobalHDRState(True)
+        else:
+            pass
         self.monitor.reverse_toggle = status
 
     def warning_box(self):
@@ -466,6 +503,7 @@ class MainWindow(QMainWindow):
         update_message_box.setIcon(QMessageBox.Icon.Information)
         update_message_box.setWindowTitle("PyAutoActions")
         update_message_box.setWindowIcon(QIcon(r"Resources\main.ico"))
+        update_message_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         update_message_box.setFixedSize(400, 200)
         update_message_box.setText(f"{self.update_msg}")
         winsound.MessageBeep()
@@ -474,7 +512,13 @@ class MainWindow(QMainWindow):
         x = (screen_geometry.width() - update_message_box.width()) // 2
         y = (screen_geometry.height() - update_message_box.height()) // 2
         update_message_box.move(x, y)
+        update_message_box.finished.connect(self.on_update_box_finished)
         update_message_box.exec()
+
+    def on_update_box_finished(self, result): # noqa
+        if result == QMessageBox.StandardButton.Yes:
+            subprocess.Popen("start https://github.com/7gxycn08/PyAutoActions/releases",
+                             shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
 
     def exit_confirm_box(self):
         exit_message_box = QMessageBox(self)
@@ -535,7 +579,7 @@ class MainWindow(QMainWindow):
             im = Image.frombuffer(
                 'RGBA',
                 (self.ICON_SIZE, self.ICON_SIZE),
-                bmp_str, 'raw', 'BGRA', 0, 1)
+                bmp_str, 'raw', 'BGRA', 0, 1) # noqa
 
             ctypes.windll.user32.DestroyIcon(icon_handle)
             ctypes.windll.gdi32.DeleteObject(bitmap)
@@ -620,10 +664,13 @@ class MainWindow(QMainWindow):
             self.monitor.manual_hdr = True
             self.monitor.count = True
             self.monitor.call_set_global_hdr_state()
-            (threading.Thread(target=lambda: subprocess.run(path, cwd=os.path.dirname(path), shell=True, check=True))
-             .start())
+            self.process_launch_thread.run = lambda: subprocess.run(path, cwd=os.path.dirname(path),
+                                                                    shell=True, check=True)
+            self.process_launch_thread.start()
+
         except subprocess.CalledProcessError:
-            threading.Thread(target=lambda: self.run_as_admin(path), daemon=True).start()
+            self.run_as_admin_thread.run = lambda: self.run_as_admin(path)
+            self.run_as_admin_thread.start()
         except Exception as e:
             self.exception_msg = f"on_action_triggered: {e}"
             self.warning_signal.emit()
@@ -714,6 +761,8 @@ class MainWindow(QMainWindow):
     def close_tray_icon(self):
         if self.exit_confirm_box() == QMessageBox.StandardButton.Yes:
             self.monitor.shutting_down = True
+            self.tray_icon.setToolTip("Shutting Down")
+            self.monitor_thread.wait()
             QCoreApplication.quit()
         else:
             pass
@@ -772,7 +821,8 @@ class MainWindow(QMainWindow):
                     self.list_widget.addItem(list_item)
                     self.create_actions()
                     self.process_list.append(exe_path)
-                    threading.Thread(target=self.save_config, daemon=True).start()
+                    self.save_config_thread.run = self.save_config
+                    self.save_config_thread.start()
                     self.update_classes_variables()
         except Exception as e:
             self.exception_msg = f"add_exe: {e}"
@@ -783,10 +833,10 @@ class MainWindow(QMainWindow):
         config_path = self.get_appdata_path("processlist.ini")
         try:
             if not os.path.isfile(config_path):
-                with open(config_path, 'w') as configfile:
+                with open(config_path, 'w', encoding="utf-8") as configfile:
                     config.add_section('HDR_APPS')
                     config.set('HDR_APPS', 'processes', '')
-                    config.write(configfile)
+                    config.write(configfile) # type: ignore
             else:
                 config.read(config_path)
         except Exception as e:
@@ -809,9 +859,8 @@ class MainWindow(QMainWindow):
             self.list_str = ', '.join(self.process_list)
             self.config['HDR_APPS']['processes'] = self.list_str
             config_path = self.get_appdata_path('processlist.ini')
-            configfile: TextIO
             with open(config_path, 'w') as configfile:
-                self.config.write(configfile)
+                self.config.write(configfile) # type: ignore
                 self.update_classes_variables()
         except Exception as e:
             self.exception_msg = f"save_config: {e}"
