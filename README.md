@@ -37,7 +37,7 @@ PyAutoActions automates HDR management for your games and applications, enabling
 3. **Startup Option**: Enable running PyAutoActions at system boot via the tray icon context menu.
 4. **Enhanced Compatibility**: Use [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR) for AutoHDR in unsupported games.
 5. **Pre-Launch HDR Activation**: Launch games from the system tray to ensure HDR is enabled beforehand when games require HDR to be enabled before launch.
-6. 
+
 ## Latest Changes
 
 - Added multi-monitor support.
