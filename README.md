@@ -10,7 +10,7 @@ PyAutoActions automates HDR management for your games and applications, enabling
 - **Game Launcher**: Launch games directly from the system tray to ensure HDR settings are correctly applied.
 - **Compatibility**: Works in tandem with ForceAutoHDR for games not officially supported by AutoHDR.
 
-![PyAutoActions Interface](https://github.com/user-attachments/assets/b1ca42ff-c061-4e59-b46f-3e564e0885b2)
+![1 2 4](https://github.com/user-attachments/assets/2ba64a3f-289d-406a-898a-700a3f5a638a)
 
 ![System Tray Example](https://github.com/user-attachments/assets/9022fb66-ce10-45cd-9b81-454cc707de53)
 
