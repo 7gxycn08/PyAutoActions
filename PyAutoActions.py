@@ -10,7 +10,6 @@ import ctypes
 import win32com.client
 from PIL import Image
 import io
-import uuid
 import urllib.request
 import time
 import subprocess
@@ -27,6 +26,9 @@ class ProcessMonitor(QWidget):
         self.shutting_down = False
         self.manual_hdr = None
         self.exception_msg = None
+        self.primary_monitor = None
+        self.global_monitors = None
+
         self.finished.connect(self.on_finished_show_msg, Qt.ConnectionType.QueuedConnection)
 
         self.process_thread = QThread()
@@ -41,14 +43,16 @@ class ProcessMonitor(QWidget):
         self.SetGlobalHDRState.arg_types = [ctypes.c_bool]
         self.SetGlobalHDRState.restype = None
 
-        self.is_hdr_running = self.hdr_switch.GetGlobalHDRState
-        self.is_hdr_running.arg_types = [ctypes.c_uint32]
+        self.SetPrimaryHDRState = self.hdr_switch.SetPrimaryHDRState
+        self.SetPrimaryHDRState.arg_types = [ctypes.c_bool]
+        self.SetPrimaryHDRState.restype = None
+
+        self.is_hdr_running = self.hdr_switch.IsHDRon
         self.is_hdr_running.restype = ctypes.c_bool
-        self.uid = int(uuid.uuid4())
-        self.toggle_state = self.is_hdr_running(ctypes.c_uint32(self.uid))
+        self.toggle_state = self.is_hdr_running()
 
     def check_hdr_state(self):
-        self.toggle_state = self.is_hdr_running(ctypes.c_uint32(self.uid))
+        self.toggle_state = self.is_hdr_running()
 
     def process_monitor(self):
         while not self.shutting_down:
@@ -119,7 +123,10 @@ class ProcessMonitor(QWidget):
 
     def toggle_hdr(self, enable):
         try:
-            self.SetGlobalHDRState(enable)
+            if self.primary_monitor:
+                self.SetPrimaryHDRState(enable)
+            else:
+                self.SetGlobalHDRState(enable)
         except Exception as e:
             self.exception_msg = f"toggle_hdr: {e}"
             self.finished.emit()
@@ -248,8 +255,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 123 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.2.3")
+        self.current_version = 124 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.2.4")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -267,8 +274,14 @@ class MainWindow(QMainWindow):
         self.exit_from_menu_bar.triggered.connect(self.close_tray_icon)
         self.file_menu.addActions([self.check_for_update_action, self.about_in_menu_bar, self.exit_from_menu_bar])
 
-        update = self.settings.value("check_for_updates", defaultValue=True, type=bool)
-        self.check_for_update_action.setChecked(bool(update))
+        self.monitor_menu = self.menu_bar.addMenu('Monitor Selection')
+        self.all_action = QAction('All Monitors', self.monitor_menu)
+        self.all_action.setCheckable(True)
+        self.all_action.triggered.connect(self.all_monitors)
+        self.primary_action = QAction('Primary Monitor', self.monitor_menu)
+        self.primary_action.setCheckable(True)
+        self.primary_action.triggered.connect(self.primary_monitor)
+        self.monitor_menu.addActions([self.all_action, self.primary_action])
 
         self.delay_menu = self.menu_bar.addMenu('Detection')
         self.low_delay = QAction('Low', self.delay_menu)
@@ -306,7 +319,6 @@ class MainWindow(QMainWindow):
         self.action_group.addAction(self.medium_delay)
         self.action_group.addAction(self.high_delay)
         self.action_group.setExclusive(True)
-        self.restore_group_settings()
         self.action_group.triggered.connect(self.save_group_settings)
 
         self.action_group_2 = QActionGroup(self)
@@ -314,8 +326,13 @@ class MainWindow(QMainWindow):
         self.action_group_2.addAction(self.hdr2sdr)
         self.action_group_2.addAction(self.respect_global_hdr)
         self.action_group_2.setExclusive(True)
-        self.restore_group_settings_2()
         self.action_group_2.triggered.connect(self.save_group_settings_2)
+
+        self.action_group_3 = QActionGroup(self)
+        self.action_group_3.addAction(self.all_action)
+        self.action_group_3.addAction(self.primary_action)
+        self.action_group_3.setExclusive(True)
+        self.action_group_3.triggered.connect(self.save_group_settings_3)
 
         self.central_widget = QWidget(self)
         self.setCentralWidget(self.central_widget)
@@ -396,7 +413,12 @@ class MainWindow(QMainWindow):
 
         delay = self.settings.value("GroupSettings", defaultValue="High")
         mode = self.settings.value("GroupSettings2", defaultValue="SDR To HDR")
+        update = self.settings.value("check_for_updates", defaultValue=True, type=bool)
 
+        self.restore_group_settings()
+        self.restore_group_settings_2()
+        self.restore_group_settings_3()
+        self.check_for_update_action.setChecked(bool(update))
         self.update_delay(delay)
         self.update_reverse(mode)
         self.monitor.delay = delay  # Update process monitor so it stays in sync upon restarts.
@@ -406,6 +428,14 @@ class MainWindow(QMainWindow):
         if self.check_for_update_action.isChecked():
             self.update_thread.run = self.check_for_update
             self.update_thread.start()
+
+    def all_monitors(self):
+        self.monitor.global_monitors = True
+        self.monitor.primary_monitor = False
+
+    def primary_monitor(self):
+        self.monitor.primary_monitor = True
+        self.monitor.global_monitors = False
 
     def center_window(self):
         screen = app.primaryScreen()
@@ -450,6 +480,12 @@ class MainWindow(QMainWindow):
                 self.settings.setValue("GroupSettings2", action.text())
                 break
 
+    def save_group_settings_3(self):
+        for action in self.action_group_3.actions():
+            if action.isChecked():
+                self.settings.setValue("GroupSettings3", action.text())
+                break
+
     def restore_group_settings(self):
         checked_action = self.settings.value("GroupSettings", "High")
         for action in self.action_group.actions():
@@ -460,6 +496,13 @@ class MainWindow(QMainWindow):
     def restore_group_settings_2(self):
         checked_action = self.settings.value("GroupSettings2", "SDR To HDR")
         for action in self.action_group_2.actions():
+            if action.text() == checked_action:
+                action.setChecked(True)
+                break
+
+    def restore_group_settings_3(self):
+        checked_action = self.settings.value("GroupSettings3", "All Monitors")
+        for action in self.action_group_3.actions():
             if action.text() == checked_action:
                 action.setChecked(True)
                 break
@@ -662,8 +705,12 @@ class MainWindow(QMainWindow):
             self.monitor.main_process = os.path.basename(path)
             self.monitor.found_process = True
             self.monitor.manual_hdr = True
-            self.monitor.count = True
-            self.monitor.call_set_global_hdr_state()
+            self.monitor.check_hdr_state()
+            hdr_status = self.monitor.toggle_state
+
+            if not hdr_status:
+                self.monitor.toggle_hdr(True)
+
             self.process_launch_thread.run = lambda: subprocess.run(path, cwd=os.path.dirname(path),
                                                                     shell=True, check=True)
             self.process_launch_thread.start()
@@ -788,7 +835,6 @@ class MainWindow(QMainWindow):
 
                 if self.monitor.toggle_state and self.monitor.found_process:
                     self.monitor.found_process = False
-                    self.monitor.call_set_global_hdr_state()
 
             else:
                 self.exception_msg = "Nothing to remove."
@@ -824,6 +870,7 @@ class MainWindow(QMainWindow):
                     self.save_config_thread.run = self.save_config
                     self.save_config_thread.start()
                     self.update_classes_variables()
+
         except Exception as e:
             self.exception_msg = f"add_exe: {e}"
             self.warning_signal.emit()
