@@ -14,6 +14,10 @@ PyAutoActions automates HDR management for your games and applications, enabling
 
 ![System Tray Example](https://github.com/user-attachments/assets/9022fb66-ce10-45cd-9b81-454cc707de53)
 
+## Monitor Selection
+
+- **`All Monitors` will apply hdr/sdr switching globally on all monitors.**
+- **`Primary Monitor` will apply hdr/sdr switching on primary monitor only.**
 
 ## Detection Settings
 
@@ -33,10 +37,10 @@ PyAutoActions automates HDR management for your games and applications, enabling
 3. **Startup Option**: Enable running PyAutoActions at system boot via the tray icon context menu.
 4. **Enhanced Compatibility**: Use [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR) for AutoHDR in unsupported games.
 5. **Pre-Launch HDR Activation**: Launch games from the system tray to ensure HDR is enabled beforehand when games require HDR to be enabled before launch.
-
+6. 
 ## Latest Changes
 
-- Fixed high CPU usage at start when Installing PyAutoActions for the first time.
+- Added multi-monitor support.
   
 
 ## Contributing
