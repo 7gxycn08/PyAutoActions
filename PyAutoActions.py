@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget,
                                QPushButton, QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout,
                                QListWidgetItem, QSizePolicy)
-from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup, QCursor, QMouseEvent
+from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup, QMouseEvent
 from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QObject, QEvent, QThread
 import sys
 import os
@@ -255,8 +255,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 124 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.2.4")
+        self.current_version = 125 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.2.5")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -413,6 +413,7 @@ class MainWindow(QMainWindow):
 
         delay = self.settings.value("GroupSettings", defaultValue="High")
         mode = self.settings.value("GroupSettings2", defaultValue="SDR To HDR")
+        monitors = self.settings.value("GroupSettings3", defaultValue="All Monitors")
         update = self.settings.value("check_for_updates", defaultValue=True, type=bool)
 
         self.restore_group_settings()
@@ -424,6 +425,11 @@ class MainWindow(QMainWindow):
         self.monitor.delay = delay  # Update process monitor so it stays in sync upon restarts.
         self.load_processes_from_config()
         self.create_actions()
+
+        if monitors == "All Monitors":
+            self.all_monitors()
+        else:
+            self.primary_monitor()
 
         if self.check_for_update_action.isChecked():
             self.update_thread.run = self.check_for_update
@@ -502,6 +508,13 @@ class MainWindow(QMainWindow):
 
     def restore_group_settings_3(self):
         checked_action = self.settings.value("GroupSettings3", "All Monitors")
+        if checked_action == "All Monitors":
+            self.monitor.global_monitors = True
+            self.monitor.primary_monitor = False
+        else:
+            self.monitor.global_monitors = False
+            self.monitor.primary_monitor = True
+
         for action in self.action_group_3.actions():
             if action.text() == checked_action:
                 action.setChecked(True)
@@ -803,7 +816,7 @@ class MainWindow(QMainWindow):
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
             self.show_window()
         elif reason == QSystemTrayIcon.ActivationReason.Context:
-            self.menu.exec(QCursor.pos())
+            self.menu.show()
 
     def close_tray_icon(self):
         if self.exit_confirm_box() == QMessageBox.StandardButton.Yes:
