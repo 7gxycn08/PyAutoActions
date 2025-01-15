@@ -41,6 +41,7 @@ PyAutoActions automates HDR management for your games and applications, enabling
 ## Latest Changes
 
 - Added multi-monitor support.
+- Up to 90% improvement in process checking efficiency.
   
 
 ## Contributing
