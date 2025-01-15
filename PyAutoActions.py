@@ -66,7 +66,7 @@ class ProcessMonitor(QWidget):
                     self.process_thread.start()
                 else:
                     self.check_hdr_state()
-                    if not self.is_process_running(self.main_process):
+                    if not self.is_process_running():
                         self.found_process = False
                         self.manual_hdr = False
                         if self.reverse_toggle == "HDR To SDR":
@@ -92,7 +92,7 @@ class ProcessMonitor(QWidget):
     def process_check(self):
         try:
             for process in self.process_list:
-                if self.is_process_running(os.path.basename(process)):
+                if self.is_process_running():
                     self.check_hdr_state()
                     if self.reverse_toggle == "SDR To HDR" and not self.toggle_state:
                         self.found_process = True
@@ -132,9 +132,10 @@ class ProcessMonitor(QWidget):
             self.finished.emit()
 
     # noinspection PyTypeChecker
-    def is_process_running(self, process_name):
+    def is_process_running(self):
         process_query_limited_information = 0x1000
 
+        process_names = [os.path.basename(path) for path in self.process_list]
         try:
             processes = (ctypes.c_ulong * 2048)() # noqa
             cb = ctypes.c_ulong(ctypes.sizeof(processes))
@@ -156,7 +157,7 @@ class ProcessMonitor(QWidget):
 
                     if success:
                         process_name_actual = os.path.basename(buffer.value)
-                        if process_name_actual == process_name:
+                        if process_name_actual in process_names:
                             return True
             return False
 
@@ -255,8 +256,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 125 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.2.5")
+        self.current_version = 126 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.2.6")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
