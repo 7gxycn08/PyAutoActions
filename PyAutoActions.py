@@ -43,11 +43,11 @@ class ProcessMonitor(QWidget):
         self.SetGlobalHDRState.arg_types = [ctypes.c_bool]
         self.SetGlobalHDRState.restype = None
 
-        self.SetPrimaryHDRState = self.hdr_switch.SetPrimaryHDRState
+        self.SetPrimaryHDRState = self.hdr_switch.SetGlobalHDRPrimary
         self.SetPrimaryHDRState.arg_types = [ctypes.c_bool]
         self.SetPrimaryHDRState.restype = None
 
-        self.is_hdr_running = self.hdr_switch.IsHDRon
+        self.is_hdr_running = self.hdr_switch.GetGlobalHDRState
         self.is_hdr_running.restype = ctypes.c_bool
         self.toggle_state = self.is_hdr_running()
 
@@ -256,8 +256,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 126 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.2.6")
+        self.current_version = 127 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.2.7")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -823,6 +823,7 @@ class MainWindow(QMainWindow):
         if self.exit_confirm_box() == QMessageBox.StandardButton.Yes:
             self.monitor.shutting_down = True
             self.tray_icon.setToolTip("Shutting Down")
+            self.window().hide()
             self.monitor_thread.wait()
             QCoreApplication.quit()
         else:
