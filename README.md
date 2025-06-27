@@ -40,9 +40,9 @@ PyAutoActions automates HDR management for your games and applications, enabling
 
 ## Latest Changes
 
-- Added multi-monitor support.
-- Up to 90% improvement in process checking efficiency.
-  
+- Added Windows 11 24H2 support
+- Updated Python to v3.13.5
+- Fixed issue where hdr won't turn on for Nvidia GPU's
 
 ## Contributing
 
