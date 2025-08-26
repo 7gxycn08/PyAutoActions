@@ -616,61 +616,63 @@ class MainWindow(QMainWindow):
         return icon_handle
 
     def get_icon_as_image_object(self, file_path, icon_index=0):
-        icon_handle = self.extract_icon(file_path, icon_index)
-        user32_dll = ctypes.WinDLL("user32.dll")
-        get_dc = user32_dll.GetDC
-        destroy_icon = user32_dll.DestroyIcon
-        release_dc = user32_dll.ReleaseDC
-        gdi32_dll = ctypes.WinDLL("gdi32.dll")
-        create_compatible_dc = gdi32_dll.CreateCompatibleDC
-        create_compatible_bitmap = gdi32_dll.CreateCompatibleBitmap
-        select_object = gdi32_dll.SelectObject
-        draw_icon_ex = gdi32_dll.DrawIconEx
-        get_di_bits = gdi32_dll.GetDIBits
-        delete_object = gdi32_dll.DeleteObject
-        delete_dc = gdi32_dll.DeleteDC
+        try:
+            icon_handle = self.extract_icon(file_path, icon_index)
+            user32_dll = ctypes.WinDLL("user32.dll")
+            get_dc = user32_dll.GetDC
+            destroy_icon = user32_dll.DestroyIcon
+            release_dc = user32_dll.ReleaseDC
+            draw_icon_ex = user32_dll.DrawIconEx
 
+            gdi32_dll = ctypes.WinDLL("gdi32")
+            create_compatible_dc = gdi32_dll.CreateCompatibleDC
+            create_compatible_bitmap = gdi32_dll.CreateCompatibleBitmap
+            select_object = gdi32_dll.SelectObject
+            get_di_bits = gdi32_dll.GetDIBits
+            delete_object = gdi32_dll.DeleteObject
+            delete_dc = gdi32_dll.DeleteDC
 
-        if icon_handle is None:
-            return None
+            if icon_handle is None:
+                return None
 
-        elif icon_handle:
-            hdc = get_dc(0)
-            mem_dc = create_compatible_dc(hdc)
-            bitmap = create_compatible_bitmap(hdc, self.ICON_SIZE, self.ICON_SIZE)
-            select_object(mem_dc, bitmap)
+            elif icon_handle:
+                hdc = get_dc(0)
+                mem_dc = create_compatible_dc(hdc)
+                bitmap = create_compatible_bitmap(hdc, self.ICON_SIZE, self.ICON_SIZE)
+                select_object(mem_dc, bitmap)
 
-            draw_icon_ex(
-                mem_dc, 0, 0, icon_handle, self.ICON_SIZE, self.ICON_SIZE, 0, None, 0x0003 | 0x0008
-            )
+                draw_icon_ex(
+                    mem_dc, 0, 0, icon_handle, self.ICON_SIZE, self.ICON_SIZE, 0, None, 0x0003 | 0x0008
+                )
 
-            bmp_header = BitMapInfoHeaders()
-            bmp_header.biSize = ctypes.sizeof(BitMapInfoHeaders)
-            bmp_header.biWidth = self.ICON_SIZE
-            bmp_header.biHeight = -self.ICON_SIZE
-            bmp_header.biPlanes = 1
-            bmp_header.biBitCount = 32
-            bmp_header.biCompression = 0
+                bmp_header = BitMapInfoHeaders()
+                bmp_header.biSize = ctypes.sizeof(BitMapInfoHeaders)
+                bmp_header.biWidth = self.ICON_SIZE
+                bmp_header.biHeight = -self.ICON_SIZE
+                bmp_header.biPlanes = 1
+                bmp_header.biBitCount = 32
+                bmp_header.biCompression = 0
 
-            bmp_str = ctypes.create_string_buffer(self.ICON_SIZE * self.ICON_SIZE * 4)
-            get_di_bits(mem_dc, bitmap, 0, self.ICON_SIZE, bmp_str, ctypes.byref(bmp_header),
-                                          0)
+                bmp_str = ctypes.create_string_buffer(self.ICON_SIZE * self.ICON_SIZE * 4)
+                get_di_bits(mem_dc, bitmap, 0, self.ICON_SIZE, bmp_str, ctypes.byref(bmp_header),
+                            0)
 
-            im = Image.frombuffer(
-                'RGBA',
-                (self.ICON_SIZE, self.ICON_SIZE),
-                bmp_str, 'raw', 'BGRA', 0, 1) # noqa
+                im = Image.frombuffer(
+                    'RGBA',
+                    (self.ICON_SIZE, self.ICON_SIZE),
+                    bmp_str, 'raw', 'BGRA', 0, 1)  # noqa
 
-            destroy_icon(icon_handle)
-            delete_object(bitmap)
-            delete_dc(mem_dc)
-            release_dc(0, hdc)
+                destroy_icon(icon_handle)
+                delete_object(bitmap)
+                delete_dc(mem_dc)
+                release_dc(0, hdc)
 
-            return im
-        else:
+                return im
+        except AttributeError:
             self.exception_msg = "get_icon_as_image_object: Failed to get image object"
             self.warning_signal.emit()
             return None
+
 
     @staticmethod
     def resize_pixmap(pixmap, width, height):
@@ -839,7 +841,7 @@ class MainWindow(QMainWindow):
                          shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
 
     def tray_icon_activated(self, reason):
-        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
             self.show_window()
         elif reason == QSystemTrayIcon.ActivationReason.Context:
             self.menu.show()
