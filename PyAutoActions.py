@@ -139,21 +139,28 @@ class ProcessMonitor(QWidget):
         try:
             processes = (ctypes.c_ulong * 2048)() # noqa
             cb = ctypes.c_ulong(ctypes.sizeof(processes))
-            ctypes.windll.psapi.EnumProcesses(ctypes.byref(processes), cb, ctypes.byref(cb))
+            # noinspection SpellCheckingInspection
+            ps_api = ctypes.WinDLL('Psapi.dll')
+            enum_processes = ps_api.EnumProcesses
+            enum_processes(ctypes.byref(processes), cb, ctypes.byref(cb))
 
             process_count = cb.value // ctypes.sizeof(ctypes.c_ulong)
             for i in range(process_count):
                 process_id = processes[i]
-                process_handle = ctypes.windll.kernel32.OpenProcess(process_query_limited_information, False,
+                kernel32_dll = ctypes.WinDLL('kernel32.dll')
+                open_process = kernel32_dll.OpenProcess
+                process_handle = open_process(process_query_limited_information, False,
                                                                     process_id)
 
                 if process_handle:
                     buffer_size = 260
                     buffer = ctypes.create_unicode_buffer(buffer_size)
-                    success = ctypes.windll.kernel32.QueryFullProcessImageNameW(process_handle, 0, buffer,
+                    query_full_process_image_name_w = kernel32_dll.QueryFullProcessImageNameW
+                    success = query_full_process_image_name_w(process_handle, 0, buffer,
                                                                                 ctypes.byref(
                                                                                     ctypes.c_ulong(buffer_size)))
-                    ctypes.windll.kernel32.CloseHandle(process_handle)
+                    close_handle = kernel32_dll.CloseHandle
+                    close_handle(process_handle)
 
                     if success:
                         process_name_actual = os.path.basename(buffer.value)
@@ -256,8 +263,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 127 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.2.7")
+        self.current_version = 128 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.2.8")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -596,7 +603,9 @@ class MainWindow(QMainWindow):
 
     def extract_icon(self, file_path, icon_index=0):
         try:
-            icon_handle = ctypes.windll.shell32.ExtractIconW(0, file_path, icon_index)
+            shell32_dll = ctypes.WinDLL("shell32.dll")
+            extract_icon_w = shell32_dll.ExtractIconW
+            icon_handle = extract_icon_w(0, file_path, icon_index)
             if icon_handle <= 1:
                 return None
         except Exception as e:
@@ -608,16 +617,30 @@ class MainWindow(QMainWindow):
 
     def get_icon_as_image_object(self, file_path, icon_index=0):
         icon_handle = self.extract_icon(file_path, icon_index)
+        user32_dll = ctypes.WinDLL("user32.dll")
+        get_dc = user32_dll.GetDC
+        destroy_icon = user32_dll.DestroyIcon
+        release_dc = user32_dll.ReleaseDC
+        gdi32_dll = ctypes.WinDLL("gdi32.dll")
+        create_compatible_dc = gdi32_dll.CreateCompatibleDC
+        create_compatible_bitmap = gdi32_dll.CreateCompatibleBitmap
+        select_object = gdi32_dll.SelectObject
+        draw_icon_ex = gdi32_dll.DrawIconEx
+        get_di_bits = gdi32_dll.GetDIBits
+        delete_object = gdi32_dll.DeleteObject
+        delete_dc = gdi32_dll.DeleteDC
+
 
         if icon_handle is None:
-            return
-        elif icon_handle:
-            hdc = ctypes.windll.user32.GetDC(0)
-            mem_dc = ctypes.windll.gdi32.CreateCompatibleDC(hdc)
-            bitmap = ctypes.windll.gdi32.CreateCompatibleBitmap(hdc, self.ICON_SIZE, self.ICON_SIZE)
-            ctypes.windll.gdi32.SelectObject(mem_dc, bitmap)
+            return None
 
-            ctypes.windll.user32.DrawIconEx(
+        elif icon_handle:
+            hdc = get_dc(0)
+            mem_dc = create_compatible_dc(hdc)
+            bitmap = create_compatible_bitmap(hdc, self.ICON_SIZE, self.ICON_SIZE)
+            select_object(mem_dc, bitmap)
+
+            draw_icon_ex(
                 mem_dc, 0, 0, icon_handle, self.ICON_SIZE, self.ICON_SIZE, 0, None, 0x0003 | 0x0008
             )
 
@@ -630,7 +653,7 @@ class MainWindow(QMainWindow):
             bmp_header.biCompression = 0
 
             bmp_str = ctypes.create_string_buffer(self.ICON_SIZE * self.ICON_SIZE * 4)
-            ctypes.windll.gdi32.GetDIBits(mem_dc, bitmap, 0, self.ICON_SIZE, bmp_str, ctypes.byref(bmp_header),
+            get_di_bits(mem_dc, bitmap, 0, self.ICON_SIZE, bmp_str, ctypes.byref(bmp_header),
                                           0)
 
             im = Image.frombuffer(
@@ -638,10 +661,10 @@ class MainWindow(QMainWindow):
                 (self.ICON_SIZE, self.ICON_SIZE),
                 bmp_str, 'raw', 'BGRA', 0, 1) # noqa
 
-            ctypes.windll.user32.DestroyIcon(icon_handle)
-            ctypes.windll.gdi32.DeleteObject(bitmap)
-            ctypes.windll.gdi32.DeleteDC(mem_dc)
-            ctypes.windll.user32.ReleaseDC(0, hdc)
+            destroy_icon(icon_handle)
+            delete_object(bitmap)
+            delete_dc(mem_dc)
+            release_dc(0, hdc)
 
             return im
         else:
@@ -706,10 +729,12 @@ class MainWindow(QMainWindow):
             self.warning_signal.emit()
 
     def run_as_admin(self, executable_path):
+        shell32_dll = ctypes.WinDLL("shell32.dll")
+        shell_execute_w = shell32_dll.ShellExecuteW
         try:
             folder_path = os.path.dirname(executable_path)
 
-            ctypes.windll.shell32.ShellExecuteW(None, "runas", executable_path, None, folder_path, 1)
+            shell_execute_w(None, "runas", executable_path, None, folder_path, 1)
         except Exception as e:
             self.exception_msg = f"run_as_admin: {e}"
             self.warning_signal.emit()
@@ -826,8 +851,6 @@ class MainWindow(QMainWindow):
             self.window().hide()
             self.monitor_thread.wait()
             QCoreApplication.quit()
-        else:
-            pass
 
     def show_window(self):
         self.center_window()
