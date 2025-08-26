@@ -4,7 +4,7 @@ PyAutoActions automates HDR management for your games and applications, enabling
 
 ## Features
 
-- **Automatic HDR Toggle**: Automatically enables HDR when a game starts and disables it upon closure.
+- **Automatic HDR Toggle**: Automatically enables HDR when a game/app starts and disables it upon closure.
 - **Low System Impact**: Operates efficiently using only 3 threads and minimal CPU usage.
 - **Tray Functionality**: Resides in the system tray for easy access and minimal interference.
 - **Game Launcher**: Launch games directly from the system tray to ensure HDR settings are correctly applied.
@@ -33,10 +33,10 @@ PyAutoActions automates HDR management for your games and applications, enabling
 ## Getting Started
 
 1. **Add Games**: Use the GUI to add the executable path of your games.
-2. **Automatic HDR Management**: HDR will enable when a game starts and disable upon its closure.
+2. **Automatic HDR Management**: HDR will enable when a game/app starts and disable upon its closure.
 3. **Startup Option**: Enable running PyAutoActions at system boot via the tray icon context menu.
 4. **Enhanced Compatibility**: Use [ForceAutoHDR](https://github.com/7gxycn08/ForceAutoHDR) for AutoHDR in unsupported games.
-5. **Pre-Launch HDR Activation**: Launch games from the system tray to ensure HDR is enabled beforehand when games require HDR to be enabled before launch.
+5. **Pre-Launch HDR Activation**: Launch games/apps from the system tray to ensure HDR is enabled beforehand when games require HDR to be enabled before launch.
 
 ## Latest Changes
 
