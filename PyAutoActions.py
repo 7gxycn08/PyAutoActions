@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout
                                QPushButton, QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout,
                                QListWidgetItem, QSizePolicy)
 from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup, QMouseEvent
-from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QObject, QEvent, QThread
+from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QObject, QThread
 import sys
 import os
 import configparser
@@ -28,15 +28,12 @@ class ProcessMonitor(QWidget):
         self.exception_msg = None
         self.primary_monitor = None
         self.global_monitors = None
-
-        self.finished.connect(self.on_finished_show_msg, Qt.ConnectionType.QueuedConnection)
-
-        self.process_thread = QThread()
-
-        self.process_list = process_list
-
         self.found_process = False
         self.main_process = None
+
+        self.finished.connect(self.on_finished_show_msg, Qt.ConnectionType.QueuedConnection)
+        self.process_thread = QThread()
+        self.process_list = process_list
 
         self.hdr_switch = ctypes.CDLL(r"Dependency\HDRSwitch.dll")
         self.SetGlobalHDRState = self.hdr_switch.SetGlobalHDRState
@@ -51,8 +48,10 @@ class ProcessMonitor(QWidget):
         self.is_hdr_running.restype = ctypes.c_bool
         self.toggle_state = self.is_hdr_running()
 
+
     def check_hdr_state(self):
         self.toggle_state = self.is_hdr_running()
+
 
     def process_monitor(self):
         while not self.shutting_down:
@@ -89,6 +88,7 @@ class ProcessMonitor(QWidget):
                 self.finished.emit()
                 break
 
+
     def process_check(self):
         try:
             for process in self.process_list:
@@ -120,6 +120,7 @@ class ProcessMonitor(QWidget):
             self.exception_msg = f"process_check: {e}"
             self.finished.emit()
             return
+
 
     def toggle_hdr(self, enable):
         try:
@@ -173,6 +174,7 @@ class ProcessMonitor(QWidget):
             self.finished.emit()
             return False
 
+
     def call_set_global_hdr_state(self):
         self.check_hdr_state()
 
@@ -218,18 +220,12 @@ class BitMapInfoHeaders(ctypes.Structure):
                 ("biClrImportant", ctypes.c_uint)]
 
 
-class RightClickFilter(QObject):
+class RightClickBlocker(QObject):
     def eventFilter(self, source, event):
         if isinstance(event, QMouseEvent):
-            if event.type() == QEvent.Type.MouseButtonPress:
-                if event.button() == Qt.MouseButton.RightButton:
-                    return True
-            elif event.type() == QEvent.Type.MouseButtonDblClick:
-                if event.button() == Qt.MouseButton.RightButton:
-                    return True
-            elif event.type() == QEvent.Type.MouseMove and event.buttons() & Qt.MouseButton.RightButton:
+            if event.button() == Qt.MouseButton.RightButton:
+                # swallow every right-click globally
                 return True
-
         return super().eventFilter(source, event)
 
 
@@ -371,7 +367,6 @@ class MainWindow(QMainWindow):
         self.add_button.clicked.connect(self.add_exe)
         self.remove_button.clicked.connect(self.remove_selected_entry)
         self.menu = QMenu()
-        self.menu.installEventFilter(RightClickFilter(self.menu))
         self.menu.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.menu.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.menu.setWindowFlags(self.menu.windowFlags() | Qt.WindowType.FramelessWindowHint)
@@ -443,13 +438,16 @@ class MainWindow(QMainWindow):
             self.update_thread.run = self.check_for_update
             self.update_thread.start()
 
+
     def all_monitors(self):
         self.monitor.global_monitors = True
         self.monitor.primary_monitor = False
 
+
     def primary_monitor(self):
         self.monitor.primary_monitor = True
         self.monitor.global_monitors = False
+
 
     def center_window(self):
         screen = app.primaryScreen()
@@ -458,6 +456,7 @@ class MainWindow(QMainWindow):
         x = (screen_geometry.width() - window_geometry.width()) // 2
         y = (screen_geometry.height() - window_geometry.height()) // 2
         self.move(x, y)
+
 
     def check_for_update(self):
         update_url = "https://raw.githubusercontent.com/7gxycn08/PyAutoActions/main/current_version.txt"
@@ -474,6 +473,7 @@ class MainWindow(QMainWindow):
             self.exception_msg = f"Check_For_Update Error: {e}"
             self.warning_signal.emit()
 
+
     def save_update_settings(self):
         if self.check_for_update_action.isChecked():
             self.settings.setValue("check_for_updates", True)
@@ -488,17 +488,20 @@ class MainWindow(QMainWindow):
                 self.settings.setValue("GroupSettings", action.text())
                 break
 
+
     def save_group_settings_2(self):
         for action in self.action_group_2.actions():
             if action.isChecked():
                 self.settings.setValue("GroupSettings2", action.text())
                 break
 
+
     def save_group_settings_3(self):
         for action in self.action_group_3.actions():
             if action.isChecked():
                 self.settings.setValue("GroupSettings3", action.text())
                 break
+
 
     def restore_group_settings(self):
         checked_action = self.settings.value("GroupSettings", "High")
@@ -507,12 +510,14 @@ class MainWindow(QMainWindow):
                 action.setChecked(True)
                 break
 
+
     def restore_group_settings_2(self):
         checked_action = self.settings.value("GroupSettings2", "SDR To HDR")
         for action in self.action_group_2.actions():
             if action.text() == checked_action:
                 action.setChecked(True)
                 break
+
 
     def restore_group_settings_3(self):
         checked_action = self.settings.value("GroupSettings3", "All Monitors")
@@ -528,6 +533,7 @@ class MainWindow(QMainWindow):
                 action.setChecked(True)
                 break
 
+
     def start_hidden_check(self):
         if self.start_hidden_checked:
             self.hide()
@@ -535,8 +541,10 @@ class MainWindow(QMainWindow):
             self.center_window()
             self.show()
 
+
     def update_delay(self, delay):
         self.monitor.delay = delay
+
 
     def update_reverse(self, status):
         if status == "SDR To HDR":
@@ -546,6 +554,7 @@ class MainWindow(QMainWindow):
         else:
             pass
         self.monitor.reverse_toggle = status
+
 
     def warning_box(self):
         warning_message_box = QMessageBox(self)
@@ -561,6 +570,7 @@ class MainWindow(QMainWindow):
         y = (screen_geometry.height() - warning_message_box.height()) // 2
         warning_message_box.move(x, y)
         warning_message_box.exec()
+
 
     def update_box(self):
         update_message_box = QMessageBox(self)
@@ -579,10 +589,12 @@ class MainWindow(QMainWindow):
         update_message_box.finished.connect(self.on_update_box_finished)
         update_message_box.exec()
 
+
     def on_update_box_finished(self, result): # noqa
         if result == QMessageBox.StandardButton.Yes:
             subprocess.Popen("start https://github.com/7gxycn08/PyAutoActions/releases",
                              shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
+
 
     def exit_confirm_box(self):
         exit_message_box = QMessageBox(self)
@@ -601,6 +613,7 @@ class MainWindow(QMainWindow):
         result = exit_message_box.exec()
         return result
 
+
     def extract_icon(self, file_path, icon_index=0):
         try:
             shell32_dll = ctypes.WinDLL("shell32.dll")
@@ -614,6 +627,7 @@ class MainWindow(QMainWindow):
             return None
 
         return icon_handle
+
 
     def get_icon_as_image_object(self, file_path, icon_index=0):
         try:
@@ -680,6 +694,7 @@ class MainWindow(QMainWindow):
         return pixmap.scaled(new_size, Qt.AspectRatioMode.KeepAspectRatio,
                              Qt.TransformationMode.SmoothTransformation)
 
+
     def pil_image_to_q_icon(self, image_object):
         if image_object is None:
             return QIcon(r"Resources\game.png")
@@ -693,10 +708,12 @@ class MainWindow(QMainWindow):
             resized_pixmap = self.resize_pixmap(q_pixmap, 32, 32)
             return QIcon(resized_pixmap)
 
+
     def delete_submenu_action(self, index):
         if self.submenu.actions():
             item_to_delete = self.submenu.actions()[index]
             self.submenu.removeAction(item_to_delete)
+
 
     def create_actions(self):
         try:
@@ -730,6 +747,7 @@ class MainWindow(QMainWindow):
             self.exception_msg = f"create_actions: {e}"
             self.warning_signal.emit()
 
+
     def run_as_admin(self, executable_path):
         shell32_dll = ctypes.WinDLL("shell32.dll")
         shell_execute_w = shell32_dll.ShellExecuteW
@@ -740,6 +758,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.exception_msg = f"run_as_admin: {e}"
             self.warning_signal.emit()
+
 
     def on_action_triggered(self, path):
         try:
@@ -763,8 +782,10 @@ class MainWindow(QMainWindow):
             self.exception_msg = f"on_action_triggered: {e}"
             self.warning_signal.emit()
 
+
     def update_classes_variables(self):
         self.monitor.process_list = self.process_list
+
 
     def run_on_boot(self):
         checked = self.run_on_boot_action.isChecked()
@@ -774,6 +795,7 @@ class MainWindow(QMainWindow):
             self.add_to_startup()
         else:
             self.remove_start_shortcut()
+
 
     def remove_start_shortcut(self):
         if self.already_added_shortcut():
@@ -792,9 +814,11 @@ class MainWindow(QMainWindow):
                 self.exception_msg = f"remove_start_shortcut: {e}"
                 self.warning_signal.emit()
 
+
     def toggle_start_hidden(self):
         checked = self.start_hidden_action.isChecked()
         self.settings.setValue("start_hidden", checked)
+
 
     def already_added_shortcut(self):
         try:
@@ -812,6 +836,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.exception_msg = f"already_added_shortcut: {e}"
             self.warning_signal.emit()
+
 
     def add_to_startup(self):
         if not self.already_added_shortcut():
@@ -835,16 +860,19 @@ class MainWindow(QMainWindow):
                 self.exception_msg = f"add_to_startup: {e}"
                 self.warning_signal.emit()
 
+
     @staticmethod
     def about_page():
         subprocess.Popen("start https://github.com/7gxycn08/PyAutoActions",
                          shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
+
 
     def tray_icon_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
             self.show_window()
         elif reason == QSystemTrayIcon.ActivationReason.Context:
             self.menu.show()
+
 
     def close_tray_icon(self):
         if self.exit_confirm_box() == QMessageBox.StandardButton.Yes:
@@ -854,10 +882,12 @@ class MainWindow(QMainWindow):
             self.monitor_thread.wait()
             QCoreApplication.quit()
 
+
     def show_window(self):
         self.center_window()
         self.show()
         self.activateWindow()
+
 
     def remove_selected_entry(self):
         try:
@@ -887,6 +917,7 @@ class MainWindow(QMainWindow):
             self.exception_msg = f"Nothing to remove. {e}"
             self.warning_signal.emit()
 
+
     def add_exe(self):
         try:
             file_dialog = QFileDialog()
@@ -915,6 +946,7 @@ class MainWindow(QMainWindow):
             self.exception_msg = f"add_exe: {e}"
             self.warning_signal.emit()
 
+
     def load_or_create_config(self):
         config = self.config
         config_path = self.get_appdata_path("processlist.ini")
@@ -930,6 +962,7 @@ class MainWindow(QMainWindow):
             self.exception_msg = f"load_or_create_config: {e}"
             self.warning_signal.emit()
 
+
     @staticmethod
     def get_appdata_path(filename):
         appdata_dir = os.environ['APPDATA']
@@ -940,6 +973,7 @@ class MainWindow(QMainWindow):
             os.makedirs(full_path)
 
         return os.path.join(full_path, filename)
+
 
     def save_config(self):
         try:
@@ -952,6 +986,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.exception_msg = f"save_config: {e}"
             self.warning_signal.emit()
+
 
     def load_processes_from_config(self):
         try:
@@ -978,6 +1013,8 @@ if __name__ == "__main__":
     with open(r'Resources\custom.css', 'r') as file:
         stylesheet = file.read()
     app = QApplication(sys.argv)
+    blocker = RightClickBlocker()
+    app.installEventFilter(blocker)
     app.setQuitOnLastWindowClosed(False)
     app.setStyleSheet(stylesheet)
     window = MainWindow()
