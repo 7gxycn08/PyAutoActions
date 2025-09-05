@@ -40,7 +40,7 @@ class ProcessMonitor(QWidget):
         self.SetGlobalHDRState.arg_types = [ctypes.c_bool]
         self.SetGlobalHDRState.restype = None
 
-        self.SetPrimaryHDRState = self.hdr_switch.SetGlobalHDRPrimary
+        self.SetPrimaryHDRState = self.hdr_switch.SetHDRState
         self.SetPrimaryHDRState.arg_types = [ctypes.c_bool]
         self.SetPrimaryHDRState.restype = None
 
@@ -259,8 +259,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 128 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.2.8")
+        self.current_version = 129 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.2.9")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
