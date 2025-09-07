@@ -40,7 +40,7 @@ class ProcessMonitor(QWidget):
         self.SetGlobalHDRState.arg_types = [ctypes.c_bool]
         self.SetGlobalHDRState.restype = None
 
-        self.SetPrimaryHDRState = self.hdr_switch.SetHDRState
+        self.SetPrimaryHDRState = self.hdr_switch.SetHDRonPrimary
         self.SetPrimaryHDRState.arg_types = [ctypes.c_bool]
         self.SetPrimaryHDRState.restype = None
 
@@ -259,8 +259,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 129 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.2.9")
+        self.current_version = 130 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.3.0")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -730,7 +730,9 @@ class MainWindow(QMainWindow):
             else:
                 for item_text in list_widget_items:
                     if item_text not in unique_items_set:
-                        base_name = os.path.basename(item_text).rstrip(".exe")
+                        base_name = os.path.basename(item_text)
+                        if base_name.endswith(".exe"):
+                            base_name = base_name[:-4]
                         image_object = self.get_icon_as_image_object(item_text)
                         icon = self.pil_image_to_q_icon(image_object)
                         pixmap_icon = QIcon(icon)
