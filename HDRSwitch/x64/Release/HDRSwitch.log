@@ -1,0 +1,13 @@
+﻿C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(524,5): warning MSB8004: Output Directory does not end with a trailing slash.  This build instance will add the slash as it is required to allow proper evaluation of the Output Directory.
+  pch.cpp
+  DisplayData.cpp
+  HDRSwitch.cpp
+C:\Users\Xen3\HDRController\HDRSwitch\HDRSwitch.cpp(164,23): warning C4018: '<': signed/unsigned mismatch
+C:\Users\Xen3\HDRController\HDRSwitch\HDRSwitch.cpp(194,6): warning C4551: function call missing argument list
+C:\Users\Xen3\HDRController\HDRSwitch\HDRSwitch.cpp(225,6): warning C4551: function call missing argument list
+     Creating library C:\Users\Xen3\HDRController\\Release_x64\HDRSwitch.lib and object C:\Users\Xen3\HDRController\\Release_x64\HDRSwitch.exp
+  Generating code
+  Previous IPDB not found, fall back to full compilation.
+  All 177 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Finished generating code
+  HDRSwitch.vcxproj -> C:\Users\Xen3\HDRController\Release_x64\HDRSwitch.dll
