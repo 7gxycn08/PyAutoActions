@@ -111,7 +111,7 @@ class ProcessMonitor(QWidget):
                         self.main_process = os.path.basename(process)
                         self.toggle_hdr(False)  # Disable HDR at process launch
                         if self.noti_state:
-                            self.notification.emit(True)
+                            self.notification.emit(False)
                         break
                     elif self.reverse_toggle == "Always On" and not self.toggle_state:
                         self.found_process = True
@@ -798,6 +798,8 @@ class MainWindow(QMainWindow):
 
             if not hdr_status:
                 self.monitor.toggle_hdr(True)
+                if self.monitor.noti_state:
+                    self.show_notification(True)
 
             self.process_launch_thread.run = lambda: subprocess.run(path, cwd=os.path.dirname(path),
                                                                     shell=True, check=True)
