@@ -18,6 +18,7 @@ import winsound
 
 class ProcessMonitor(QWidget):
     finished = Signal()
+    notification = Signal(bool)
 
     def __init__(self, process_list):
         super().__init__()
@@ -27,9 +28,9 @@ class ProcessMonitor(QWidget):
         self.manual_hdr = None
         self.exception_msg = None
         self.primary_monitor = None
-        self.global_monitors = None
         self.found_process = False
         self.main_process = None
+        self.noti_state = None
 
         self.finished.connect(self.on_finished_show_msg, Qt.ConnectionType.QueuedConnection)
         self.process_thread = QThread()
@@ -70,8 +71,12 @@ class ProcessMonitor(QWidget):
                         self.manual_hdr = False
                         if self.reverse_toggle == "HDR To SDR":
                             self.toggle_hdr(True)  # Enable HDR when process exits
+                            if self.noti_state:
+                                self.notification.emit(True)
                         else:
                             self.toggle_hdr(False)  # Disable HDR when process exits if "SDR To HDR"
+                            if self.noti_state:
+                                self.notification.emit(False)
 
                 # Add delay based on self.delay value
                 if self.delay == "High":
@@ -98,16 +103,22 @@ class ProcessMonitor(QWidget):
                         self.found_process = True
                         self.main_process = os.path.basename(process)
                         self.toggle_hdr(True)  # Enable HDR at process launch
+                        if self.noti_state:
+                            self.notification.emit(True)
                         break
                     elif self.reverse_toggle == "HDR To SDR" and self.toggle_state:
                         self.found_process = True
                         self.main_process = os.path.basename(process)
                         self.toggle_hdr(False)  # Disable HDR at process launch
+                        if self.noti_state:
+                            self.notification.emit(True)
                         break
                     elif self.reverse_toggle == "Always On" and not self.toggle_state:
                         self.found_process = True
                         self.main_process = os.path.basename(process)
                         self.toggle_hdr(True)  # Enable HDR at process launch
+                        if self.noti_state:
+                            self.notification.emit(True)
                         break
                     elif self.reverse_toggle == "Always On" and self.toggle_state:
                         self.found_process = True
@@ -175,26 +186,6 @@ class ProcessMonitor(QWidget):
             return False
 
 
-    def call_set_global_hdr_state(self):
-        self.check_hdr_state()
-
-        if self.reverse_toggle == "SDR To HDR":
-            if self.toggle_state:  # HDR is currently enabled
-                self.toggle_hdr(False)  # Disable HDR when process exits
-            else:
-                self.toggle_hdr(True)  # Enable HDR at process launch
-        elif self.reverse_toggle == "HDR To SDR":
-            if self.toggle_state:  # HDR is currently enabled
-                self.toggle_hdr(False)  # Disable HDR at process launch
-            else:
-                self.toggle_hdr(True)  # Enable HDR when process exits
-        elif self.reverse_toggle == "Always On":
-            if self.toggle_state:
-                self.toggle_hdr(True)
-            else:
-                self.toggle_hdr(False)
-
-
     def on_finished_show_msg(self):
         warning_message_box = QMessageBox()
         warning_message_box.setWindowTitle("PyAutoActions Error")
@@ -226,6 +217,8 @@ class RightClickBlocker(QObject):
             if event.button() == Qt.MouseButton.RightButton:
                 # swallow every right-click globally
                 return True
+            if event.button() == Qt.MouseButton.LeftButton:
+                return False
         return super().eventFilter(source, event)
 
 
@@ -259,8 +252,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 130 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.3.0")
+        self.current_version = 131 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.3.1")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -270,13 +263,18 @@ class MainWindow(QMainWindow):
         self.check_for_update_action.setCheckable(True)
         self.check_for_update_action.triggered.connect(self.save_update_settings)
 
+        self.notifications_action = QAction('Enable Notifications', self.file_menu)
+        self.notifications_action.setCheckable(True)
+        self.notifications_action.triggered.connect(self.save_update_settings)
+
         self.file_menu.addSeparator()
 
         self.about_in_menu_bar = QAction(QIcon(r"Resources\about.ico"), 'About', self)
         self.about_in_menu_bar.triggered.connect(self.about_page)
         self.exit_from_menu_bar = QAction(QIcon(r"Resources\exit.ico"), 'Exit Application', self)
         self.exit_from_menu_bar.triggered.connect(self.close_tray_icon)
-        self.file_menu.addActions([self.check_for_update_action, self.about_in_menu_bar, self.exit_from_menu_bar])
+        self.file_menu.addActions([self.check_for_update_action,self.notifications_action,
+                                   self.about_in_menu_bar, self.exit_from_menu_bar])
 
         self.monitor_menu = self.menu_bar.addMenu('Monitor Selection')
         self.all_action = QAction('All Monitors', self.monitor_menu)
@@ -418,16 +416,21 @@ class MainWindow(QMainWindow):
         mode = self.settings.value("GroupSettings2", defaultValue="SDR To HDR")
         monitors = self.settings.value("GroupSettings3", defaultValue="All Monitors")
         update = self.settings.value("check_for_updates", defaultValue=True, type=bool)
+        notify = self.settings.value("notifications", defaultValue=True, type=bool)
 
         self.restore_group_settings()
         self.restore_group_settings_2()
         self.restore_group_settings_3()
         self.check_for_update_action.setChecked(bool(update))
+        self.notifications_action.setChecked(bool(notify))
         self.update_delay(delay)
         self.update_reverse(mode)
         self.monitor.delay = delay  # Update process monitor so it stays in sync upon restarts.
+        self.monitor.noti_state = notify
         self.load_processes_from_config()
         self.create_actions()
+        self.monitor.notification.connect(self.show_notification)
+
 
         if monitors == "All Monitors":
             self.all_monitors()
@@ -438,6 +441,22 @@ class MainWindow(QMainWindow):
             self.update_thread.run = self.check_for_update
             self.update_thread.start()
 
+
+    def show_notification(self, status):
+        if status:
+            self.tray_icon.showMessage(
+                "",
+                "HDR Turned On.",
+                QSystemTrayIcon.MessageIcon.Information,
+                5000  # duration in ms
+            )
+        if not status:
+            self.tray_icon.showMessage(
+                "",
+                "HDR Turned OFF.",
+                QSystemTrayIcon.MessageIcon.Information,
+                5000  # duration in ms
+            )
 
     def all_monitors(self):
         self.monitor.global_monitors = True
@@ -480,6 +499,13 @@ class MainWindow(QMainWindow):
             self.check_for_update()
         else:
             self.settings.setValue("check_for_updates", False)
+
+        if self.notifications_action.isChecked():
+            self.settings.setValue("notifications", True)
+            self.monitor.noti_state = True
+        else:
+            self.settings.setValue("notifications", False)
+            self.monitor.noti_state = False
 
 
     def save_group_settings(self):
