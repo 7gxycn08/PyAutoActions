@@ -30,6 +30,7 @@ class ProcessMonitor(QWidget):
         self.primary_monitor = None
         self.found_process = False
         self.main_process = None
+        # noinspection SpellCheckingInspection
         self.noti_state = None
 
         self.finished.connect(self.on_finished_show_msg, Qt.ConnectionType.QueuedConnection)
@@ -231,6 +232,8 @@ class MainWindow(QMainWindow):
         self.settings = QSettings("7gxycn08@Github", "PyAutoActions")
         self.warning_signal.connect(self.warning_box, Qt.ConnectionType.QueuedConnection)
         self.update_signal.connect(self.update_box, Qt.ConnectionType.QueuedConnection)
+        self.setAcceptDrops(True)
+        self.dropped_file_path = None
 
         self.exception_msg = None
         self.update_msg = None
@@ -252,8 +255,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 131 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.3.1")
+        self.current_version = 132 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.3.2")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -426,6 +429,7 @@ class MainWindow(QMainWindow):
         self.update_delay(delay)
         self.update_reverse(mode)
         self.monitor.delay = delay  # Update process monitor so it stays in sync upon restarts.
+        # noinspection SpellCheckingInspection
         self.monitor.noti_state = notify
         self.load_processes_from_config()
         self.create_actions()
@@ -441,6 +445,22 @@ class MainWindow(QMainWindow):
             self.update_thread.run = self.check_for_update
             self.update_thread.start()
 
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():  # Files are sent as URLs
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        urls = event.mimeData().urls()
+        if urls:
+            # Get the first file path
+            self.dropped_file_path = urls[0].toLocalFile()
+
+            # Confirm action
+            event.acceptProposedAction()
+            self.add_exe()
 
     def show_notification(self, status):
         if status:
@@ -502,9 +522,11 @@ class MainWindow(QMainWindow):
 
         if self.notifications_action.isChecked():
             self.settings.setValue("notifications", True)
+            # noinspection SpellCheckingInspection
             self.monitor.noti_state = True
         else:
             self.settings.setValue("notifications", False)
+            # noinspection SpellCheckingInspection
             self.monitor.noti_state = False
 
 
@@ -901,6 +923,8 @@ class MainWindow(QMainWindow):
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
             self.show_window()
         elif reason == QSystemTrayIcon.ActivationReason.Context:
+            app.removeEventFilter(blocker)
+            app.installEventFilter(blocker)
             self.menu.show()
 
 
@@ -950,14 +974,23 @@ class MainWindow(QMainWindow):
 
     def add_exe(self):
         try:
-            file_dialog = QFileDialog()
-            file_path, _ = file_dialog.getOpenFileName(self, "Select Executable", "",
-                                                       "Executable Files (*.exe)")
+            if self.dropped_file_path:
+                file_path = self.dropped_file_path
+            else:
+                file_dialog = QFileDialog()
+                file_path, _ = file_dialog.getOpenFileName(self, "Select Executable", "",
+                                                           "Executable Files (*.exe)")
             if file_path:
                 exe_path = os.path.abspath(file_path)
                 if exe_path in self.process_list:
                     self.exception_msg = f"Process {exe_path} already exists in the list."
                     self.warning_signal.emit()
+                    self.dropped_file_path = None
+
+                elif file_path[-4:].lower() != ".exe":
+                    self.exception_msg = f"File {exe_path} is not a valid exe."
+                    self.warning_signal.emit()
+                    self.dropped_file_path = None
 
                 else:
                     icon = self.get_icon_as_image_object(exe_path)
@@ -971,10 +1004,12 @@ class MainWindow(QMainWindow):
                     self.save_config_thread.run = self.save_config
                     self.save_config_thread.start()
                     self.update_classes_variables()
+                    self.dropped_file_path = None
 
         except Exception as e:
             self.exception_msg = f"add_exe: {e}"
             self.warning_signal.emit()
+            self.dropped_file_path = None
 
 
     def load_or_create_config(self):

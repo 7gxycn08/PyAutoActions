@@ -1,0 +1,41 @@
+QPushButton {
+    width: 50px;
+    height: 20px;
+    background-color: rgba(47, 128, 237, 250);
+    border-radius: 10px;
+    color: #fff;
+    font-family: Inter,-apple-system,system-ui,"Segoe UI",Helvetica,Arial,sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.5;
+    padding: 1px 2px;
+}
+QPushButton:hover {
+    background-color: #1366d6;
+    opacity: 1;
+}
+QMenuBar {
+    border-radius: 5px;
+}
+QListWidget {
+	background-color: rgb(43, 45, 48);
+}
+QListWidget::item:selected{
+    background-color: rgb(47, 128, 237);
+}
+QListWidget::item:hover{
+    background-color: rgb(47, 128, 237);
+}
+QMenu {
+    border-radius: 5px;
+    min-width: 10px;
+}
+QMenu::item {
+    margin: 2px;
+    margin-left: 2px;
+    padding: 5px 15px;
+}
+QMenu::item:selected {
+    border-radius: 7px;
+    background-color: rgba(0, 133, 234, 50);
+}
