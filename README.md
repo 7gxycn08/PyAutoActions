@@ -5,6 +5,7 @@ PyAutoActions automates HDR management for your games and applications, enabling
 ## Features
 
 - **Automatic HDR Toggle**: Automatically enables HDR when a game/app starts and disables it upon closure.
+- **Automatic Refresh Rate Switching Toggle**: Automatically changes monitors Refresh Rate when a game/app starts and reverts Refresh Rate to previous value upon closure.
 - **Low System Impact**: Operates efficiently using only 3 threads and minimal CPU usage.
 - **Tray Functionality**: Resides in the system tray for easy access and minimal interference.
 - **Game Launcher**: Launch games directly from the system tray to ensure HDR settings are correctly applied.
@@ -13,6 +14,10 @@ PyAutoActions automates HDR management for your games and applications, enabling
 ![1 2 4](https://github.com/user-attachments/assets/2ba64a3f-289d-406a-898a-700a3f5a638a)
 
 ![System Tray Example](https://github.com/user-attachments/assets/9022fb66-ce10-45cd-9b81-454cc707de53)
+
+## Refresh Rate Switching
+- **`Enable Refresh Rate Switching` when toggled on user will be asked to enter target refresh value everytime user adds a new exe.**
+- **Monitor refresh rate will change to target value upon process start and return to previous value on process exit.**
 
 ## Monitor Selection
 
@@ -43,6 +48,7 @@ PyAutoActions automates HDR management for your games and applications, enabling
 - Added Windows 11 24H2 support
 - Updated Python to v3.13.7
 - Fixed issue where hdr won't turn on for Nvidia GPU's
+- Added new feature Refresh Rate Switching per exe under file menu in gui enabled by default
 
 ## Contributing
 
