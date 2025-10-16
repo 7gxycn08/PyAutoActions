@@ -1,14 +1,17 @@
 from PySide6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget,
                                QPushButton, QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout,
-                               QListWidgetItem, QSizePolicy)
+                               QListWidgetItem, QSizePolicy, QInputDialog)
 from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup, QMouseEvent
 from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QObject, QThread
+from pathlib import Path
+from PIL import Image
+from RefreshRateSwitch import DevMode
+import json
 import sys
 import os
 import configparser
 import ctypes
 import win32com.client
-from PIL import Image
 import io
 import urllib.request
 import time
@@ -20,7 +23,7 @@ class ProcessMonitor(QWidget):
     finished = Signal()
     notification = Signal(bool)
 
-    def __init__(self, process_list):
+    def __init__(self, process_list, is_refresh):
         super().__init__()
         self.delay = None
         self.reverse_toggle = None
@@ -32,6 +35,13 @@ class ProcessMonitor(QWidget):
         self.main_process = None
         # noinspection SpellCheckingInspection
         self.noti_state = None
+        self.is_refresh = is_refresh
+        self.current_refresh_rate = None
+        self.user32 = ctypes.WinDLL('user32', use_last_error=True)
+        self.ENUM_CURRENT_SETTINGS = -1
+        self.CDS_UPDATE_REGISTRY = 0x01
+        self.DISPLAY_CHANGE_SUCCESSFUL = 0
+
 
         self.finished.connect(self.on_finished_show_msg, Qt.ConnectionType.QueuedConnection)
         self.process_thread = QThread()
@@ -53,6 +63,18 @@ class ProcessMonitor(QWidget):
 
     def check_hdr_state(self):
         self.toggle_state = self.is_hdr_running()
+
+
+    @staticmethod
+    def get_appdata_path(filename):
+        appdata_dir = os.environ['APPDATA']
+        app_dir = 'PyAutoActions'
+        full_path = os.path.join(appdata_dir, app_dir)
+
+        if not os.path.exists(full_path):
+            os.makedirs(full_path)
+
+        return os.path.join(full_path, filename)
 
 
     def process_monitor(self):
@@ -137,12 +159,78 @@ class ProcessMonitor(QWidget):
     def toggle_hdr(self, enable):
         try:
             if self.primary_monitor:
+                if enable:
+                    self.switch_refresh_rate()
+                else:
+                    self.switch_back_refresh_rate()
                 self.SetPrimaryHDRState(enable)
             else:
+                if enable:
+                    self.switch_refresh_rate()
+                else:
+                    self.switch_back_refresh_rate()
                 self.SetGlobalHDRState(enable)
         except Exception as e:
             self.exception_msg = f"toggle_hdr: {e}"
             self.finished.emit()
+
+
+    def check_json_data(self):
+        json_path = self.get_appdata_path("refresh_rate_data.json")
+        with open(json_path) as f:
+            data = json.load(f)
+        json_text = json.dumps(data)
+        if self.main_process in json_text:
+            return True
+        else:
+            return False
+
+
+    def get_refresh_from_json(self):
+        json_path = self.get_appdata_path("refresh_rate_data.json")
+        with open(json_path) as f:
+            data = json.load(f)
+
+        refresh_rate = data[self.main_process]
+        return refresh_rate
+
+
+    def switch_refresh_rate(self):
+        if self.is_refresh:
+            proceed = self.check_json_data()
+            if proceed:
+                target_refresh_rate = self.get_refresh_from_json()
+                dev_mode = DevMode()
+                dev_mode.dmSize = ctypes.sizeof(DevMode)
+                self.user32.EnumDisplaySettingsW(None, self.ENUM_CURRENT_SETTINGS, ctypes.byref(dev_mode))
+                self.current_refresh_rate = dev_mode.dmDisplayFrequency
+                dev_mode.dmDisplayFrequency = int(target_refresh_rate)
+                dev_mode.dmFields = 0x400000
+                result = self.user32.ChangeDisplaySettingsExW(None, ctypes.byref(dev_mode), None,
+                                                              self.CDS_UPDATE_REGISTRY, None)
+                if result == self.DISPLAY_CHANGE_SUCCESSFUL:
+                    pass
+                else:
+                    self.exception_msg = f"switch_refresh_rate: Failed to change refresh_rate"
+                    self.finished.emit()
+
+
+    def switch_back_refresh_rate(self):
+        if self.is_refresh:
+            proceed = self.check_json_data()
+            if proceed:
+                dev_mode = DevMode()
+                dev_mode.dmSize = ctypes.sizeof(DevMode)
+                dev_mode.dmDisplayFrequency = int(self.current_refresh_rate)
+                dev_mode.dmFields = 0x400000
+                result = self.user32.ChangeDisplaySettingsExW(None, ctypes.byref(dev_mode), None,
+                                                              self.CDS_UPDATE_REGISTRY, None)
+                if result == self.DISPLAY_CHANGE_SUCCESSFUL:
+                    pass
+                else:
+                    self.exception_msg = f"switch_back_refresh_rate: Failed to change refresh_rate"
+                    self.finished.emit()
+
 
     # noinspection PyTypeChecker
     def is_process_running(self):
@@ -226,14 +314,18 @@ class RightClickBlocker(QObject):
 class MainWindow(QMainWindow):
     warning_signal = Signal()
     update_signal = Signal()
+    refresh_signal = Signal()
 
     def __init__(self):
         super().__init__()
         self.settings = QSettings("7gxycn08@Github", "PyAutoActions")
         self.warning_signal.connect(self.warning_box, Qt.ConnectionType.QueuedConnection)
         self.update_signal.connect(self.update_box, Qt.ConnectionType.QueuedConnection)
+        self.refresh_signal.connect(self.refresh_box, Qt.ConnectionType.QueuedConnection)
         self.setAcceptDrops(True)
         self.dropped_file_path = None
+        self.current_file_path = None
+        self.refresh = None
 
         self.exception_msg = None
         self.update_msg = None
@@ -255,8 +347,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 132 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.3.2")
+        self.current_version = 133 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.3.3")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -270,6 +362,10 @@ class MainWindow(QMainWindow):
         self.notifications_action.setCheckable(True)
         self.notifications_action.triggered.connect(self.save_update_settings)
 
+        self.refresh_rate_switching_action = QAction("Enable Refresh Rate Switching", self.file_menu)
+        self.refresh_rate_switching_action.setCheckable(True)
+        self.refresh_rate_switching_action.triggered.connect(self.save_update_settings)
+
         self.file_menu.addSeparator()
 
         self.about_in_menu_bar = QAction(QIcon(r"Resources\about.ico"), 'About', self)
@@ -277,6 +373,7 @@ class MainWindow(QMainWindow):
         self.exit_from_menu_bar = QAction(QIcon(r"Resources\exit.ico"), 'Exit Application', self)
         self.exit_from_menu_bar.triggered.connect(self.close_tray_icon)
         self.file_menu.addActions([self.check_for_update_action,self.notifications_action,
+                                   self.refresh_rate_switching_action,
                                    self.about_in_menu_bar, self.exit_from_menu_bar])
 
         self.monitor_menu = self.menu_bar.addMenu('Monitor Selection')
@@ -341,7 +438,6 @@ class MainWindow(QMainWindow):
 
         self.central_widget = QWidget(self)
         self.setCentralWidget(self.central_widget)
-
         self.list_widget = QListWidget()
         size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.list_widget.setSizePolicy(size_policy)
@@ -410,24 +506,22 @@ class MainWindow(QMainWindow):
         self.tray_icon.setContextMenu(self.menu)
         self.start_hidden_check()
         self.tray_icon.show()
-        self.monitor = ProcessMonitor(self.process_list)
-
-        self.monitor_thread.run = self.monitor.process_monitor
-        self.monitor_thread.start()
 
         delay = self.settings.value("GroupSettings", defaultValue="High")
         mode = self.settings.value("GroupSettings2", defaultValue="SDR To HDR")
         monitors = self.settings.value("GroupSettings3", defaultValue="All Monitors")
         update = self.settings.value("check_for_updates", defaultValue=True, type=bool)
         notify = self.settings.value("notifications", defaultValue=True, type=bool)
+        refresh = self.settings.value("refresh_rate_switching", defaultValue=True, type=bool)
 
-        self.restore_group_settings()
-        self.restore_group_settings_2()
-        self.restore_group_settings_3()
         self.check_for_update_action.setChecked(bool(update))
         self.notifications_action.setChecked(bool(notify))
-        self.update_delay(delay)
-        self.update_reverse(mode)
+        self.refresh_rate_switching_action.setChecked(bool(refresh))
+
+        self.monitor = ProcessMonitor(self.process_list, refresh)
+
+        self.monitor_thread.run = self.monitor.process_monitor
+        self.monitor_thread.start()
         self.monitor.delay = delay  # Update process monitor so it stays in sync upon restarts.
         # noinspection SpellCheckingInspection
         self.monitor.noti_state = notify
@@ -445,12 +539,19 @@ class MainWindow(QMainWindow):
             self.update_thread.run = self.check_for_update
             self.update_thread.start()
 
+        self.restore_group_settings()
+        self.restore_group_settings_2()
+        self.restore_group_settings_3()
+        self.update_delay(delay)
+        self.update_reverse(mode)
+
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():  # Files are sent as URLs
             event.acceptProposedAction()
         else:
             event.ignore()
+
 
     def dropEvent(self, event):
         urls = event.mimeData().urls()
@@ -461,6 +562,7 @@ class MainWindow(QMainWindow):
             # Confirm action
             event.acceptProposedAction()
             self.add_exe()
+
 
     def show_notification(self, status):
         if status:
@@ -477,6 +579,7 @@ class MainWindow(QMainWindow):
                 QSystemTrayIcon.MessageIcon.Information,
                 5000  # duration in ms
             )
+
 
     def all_monitors(self):
         self.monitor.global_monitors = True
@@ -528,6 +631,13 @@ class MainWindow(QMainWindow):
             self.settings.setValue("notifications", False)
             # noinspection SpellCheckingInspection
             self.monitor.noti_state = False
+
+        if self.refresh_rate_switching_action.isChecked():
+            self.settings.setValue("refresh_rate_switching", True)
+            self.monitor.is_refresh = True
+        else:
+            self.settings.setValue("refresh_rate_switching", False)
+            self.monitor.is_refresh = False
 
 
     def save_group_settings(self):
@@ -644,6 +754,45 @@ class MainWindow(QMainWindow):
                              shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
 
 
+    def refresh_box(self):
+        refresh_message_box = QMessageBox(self)
+        refresh_message_box.setIcon(QMessageBox.Icon.Question)
+        refresh_message_box.setWindowTitle("PyAutoActions")
+        refresh_message_box.setWindowIcon(QIcon(r"Resources\main.ico"))
+        refresh_message_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        refresh_message_box.setFixedSize(400, 200)
+        refresh_message_box.setText(f"Do you want to enable refresh rate switching for this exe?")
+        winsound.MessageBeep()
+        screen = app.primaryScreen()
+        screen_geometry = screen.availableGeometry()
+        x = (screen_geometry.width() - refresh_message_box.width()) // 2
+        y = (screen_geometry.height() - refresh_message_box.height()) // 2
+        refresh_message_box.move(x, y)
+        refresh_message_box.finished.connect(self.on_refresh_box_finished)
+        refresh_message_box.exec()
+
+
+    def on_refresh_box_finished(self, result):
+        if result == QMessageBox.StandardButton.Yes:
+            self.refresh_rate_entry()
+
+
+    def refresh_rate_entry(self):
+        refresh_dialog = QInputDialog(self)
+        refresh_dialog.setWindowTitle("PyAutoActions")
+        refresh_dialog.setLabelText("Enter Target Refresh Rate Value:")
+        refresh_dialog.setWindowIcon(QIcon(r"Resources\main.ico"))
+        refresh_dialog.setFixedSize(400, 200)
+        refresh_dialog.textValueSelected.connect(self.save_refresh_info)
+        winsound.MessageBeep()
+        screen = app.primaryScreen()
+        screen_geometry = screen.availableGeometry()
+        x = (screen_geometry.width() - refresh_dialog.width()) // 2
+        y = (screen_geometry.height() - refresh_dialog.height()) // 2
+        refresh_dialog.move(x, y)
+        refresh_dialog.show()  # Non-blocking
+
+
     def exit_confirm_box(self):
         exit_message_box = QMessageBox(self)
         exit_message_box.setIcon(QMessageBox.Icon.Question)
@@ -660,6 +809,44 @@ class MainWindow(QMainWindow):
         exit_message_box.move(x, y)
         result = exit_message_box.exec()
         return result
+
+
+    def save_refresh_info(self, refresh_rate):
+        if refresh_rate.isdigit():
+            json_path = self.get_appdata_path("refresh_rate_data.json")
+            file_path = Path(json_path)
+            base_exe = os.path.basename(self.current_file_path)
+            data = {f"{base_exe}": f"{refresh_rate}"}  # new or updated values
+
+            # Step 1: Load existing data if file exists
+            if file_path.exists():
+                with open(file_path, "r") as f:
+                    existing_data = json.load(f)
+            else:
+                existing_data = {}
+
+            # Step 2: Update existing data
+            existing_data.update(data)
+
+            # Step 3: Save back to file
+            with open(file_path, "w") as f:
+                json.dump(existing_data, f, indent=4)
+        else:
+            self.exception_msg = "save_refresh_info: Refresh Value Not a Valid Number."
+            self.warning_signal.emit()
+            count = self.list_widget.count()
+            if count > 0:
+                last_item = self.list_widget.takeItem(count - 1)
+                selected_text = last_item.text()
+                exe_index_to_remove = self.process_list.index(selected_text)
+                self.delete_submenu_action(exe_index_to_remove)
+                self.process_list.pop(exe_index_to_remove)
+                self.save_config()
+                self.list_widget.takeItem(self.list_widget.row(last_item))
+                self.create_actions()
+                self.update_classes_variables()
+                del last_item
+
 
 
     def extract_icon(self, file_path, icon_index=0):
@@ -942,6 +1129,17 @@ class MainWindow(QMainWindow):
         self.show()
         self.activateWindow()
 
+    # noinspection PyMethodMayBeStatic
+    def remove_refresh_data(self, process_key):
+        json_path = self.get_appdata_path("refresh_rate_data.json")
+        with open(json_path, "r") as f:
+            data = json.load(f)
+        key = os.path.basename(process_key)
+        if key in data:
+            del data[key]
+        with open(json_path, "w") as f:
+            json.dump(data, f, indent=4)
+
 
     def remove_selected_entry(self):
         try:
@@ -956,6 +1154,7 @@ class MainWindow(QMainWindow):
                 self.list_widget.takeItem(self.list_widget.row(selected_item))
                 self.create_actions()
                 self.update_classes_variables()
+                self.remove_refresh_data(selected_text)
 
                 if self.monitor.toggle_state and self.monitor.found_process:
                     self.monitor.found_process = False
@@ -976,10 +1175,16 @@ class MainWindow(QMainWindow):
         try:
             if self.dropped_file_path:
                 file_path = self.dropped_file_path
+                self.current_file_path = file_path
+                if self.refresh_rate_switching_action.isChecked() and file_path:
+                    self.refresh_signal.emit()
             else:
                 file_dialog = QFileDialog()
                 file_path, _ = file_dialog.getOpenFileName(self, "Select Executable", "",
                                                            "Executable Files (*.exe)")
+                self.current_file_path = file_path
+                if self.refresh_rate_switching_action.isChecked() and file_path:
+                    self.refresh_signal.emit()
             if file_path:
                 exe_path = os.path.abspath(file_path)
                 if exe_path in self.process_list:
