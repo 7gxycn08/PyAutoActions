@@ -11,6 +11,7 @@ import sys
 import os
 import configparser
 import ctypes
+import ctypes.wintypes as wintypes
 import win32com.client
 import io
 import urllib.request
@@ -18,6 +19,20 @@ import time
 import subprocess
 import winsound
 
+
+class ProcessCheckEntry32(ctypes.Structure):
+    _fields_ = [
+        ('dwSize', wintypes.DWORD),
+        ('cntUsage', wintypes.DWORD),
+        ('th32ProcessID', wintypes.DWORD),
+        ('th32DefaultHeapID', ctypes.POINTER(ctypes.c_ulong)),
+        ('th32ModuleID', wintypes.DWORD),
+        ('cntThreads', wintypes.DWORD),
+        ('th32ParentProcessID', wintypes.DWORD),
+        ('pcPriClassBase', ctypes.c_long),
+        ('dwFlags', wintypes.DWORD),
+        ('szExeFile', wintypes.CHAR * 260),
+    ]
 
 class ProcessMonitor(QWidget):
     finished = Signal()
@@ -58,11 +73,6 @@ class ProcessMonitor(QWidget):
 
         self.is_hdr_running = self.hdr_switch.GetGlobalHDRState
         self.is_hdr_running.restype = ctypes.c_bool
-        self.toggle_state = self.is_hdr_running()
-
-
-    def check_hdr_state(self):
-        self.toggle_state = self.is_hdr_running()
 
 
     @staticmethod
@@ -88,8 +98,7 @@ class ProcessMonitor(QWidget):
                     self.process_thread.run = self.process_check
                     self.process_thread.start()
                 else:
-                    self.check_hdr_state()
-                    if not self.is_process_running():
+                    if not self.is_process_running(self.main_process):
                         self.found_process = False
                         self.manual_hdr = False
                         if self.reverse_toggle == "HDR To SDR":
@@ -120,33 +129,34 @@ class ProcessMonitor(QWidget):
     def process_check(self):
         try:
             for process in self.process_list:
-                if self.is_process_running():
-                    self.check_hdr_state()
-                    if self.reverse_toggle == "SDR To HDR" and not self.toggle_state:
+                base_process = os.path.basename(process)
+                i = self.is_process_running(base_process)
+                if i:
+                    if self.reverse_toggle == "SDR To HDR":
                         self.found_process = True
-                        self.main_process = os.path.basename(process)
+                        self.main_process = base_process
                         self.toggle_hdr(True)  # Enable HDR at process launch
+
                         if self.noti_state:
                             self.notification.emit(True)
                         break
-                    elif self.reverse_toggle == "HDR To SDR" and self.toggle_state:
+
+                    elif self.reverse_toggle == "HDR To SDR":
                         self.found_process = True
-                        self.main_process = os.path.basename(process)
+                        self.main_process = base_process
                         self.toggle_hdr(False)  # Disable HDR at process launch
+
                         if self.noti_state:
                             self.notification.emit(False)
                         break
-                    elif self.reverse_toggle == "Always On" and not self.toggle_state:
+
+                    elif self.reverse_toggle == "Always On":
                         self.found_process = True
-                        self.main_process = os.path.basename(process)
+                        self.main_process = base_process
                         self.toggle_hdr(True)  # Enable HDR at process launch
+
                         if self.noti_state:
                             self.notification.emit(True)
-                        break
-                    elif self.reverse_toggle == "Always On" and self.toggle_state:
-                        self.found_process = True
-                        self.main_process = os.path.basename(process)
-                        # Enable HDR at process launch
                         break
 
         except Exception as e:
@@ -233,42 +243,30 @@ class ProcessMonitor(QWidget):
 
 
     # noinspection PyTypeChecker
-    def is_process_running(self):
-        process_query_limited_information = 0x1000
-
-        process_names = [os.path.basename(path) for path in self.process_list]
+    def is_process_running(self, process_name: str) -> bool:
         try:
-            processes = (ctypes.c_ulong * 2048)() # noqa
-            cb = ctypes.c_ulong(ctypes.sizeof(processes))
-            # noinspection SpellCheckingInspection
-            ps_api = ctypes.WinDLL('Psapi.dll')
-            enum_processes = ps_api.EnumProcesses
-            enum_processes(ctypes.byref(processes), cb, ctypes.byref(cb))
+            kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
 
-            process_count = cb.value // ctypes.sizeof(ctypes.c_ulong)
-            for i in range(process_count):
-                process_id = processes[i]
-                kernel32_dll = ctypes.WinDLL('kernel32.dll')
-                open_process = kernel32_dll.OpenProcess
-                process_handle = open_process(process_query_limited_information, False,
-                                                                    process_id)
+            # Take a snapshot of all processes
+            h_snapshot = kernel32.CreateToolhelp32Snapshot(0x00000002, 0)
+            if h_snapshot == wintypes.HANDLE(-1).value:
+                raise ctypes.WinError(ctypes.get_last_error())
 
-                if process_handle:
-                    buffer_size = 260
-                    buffer = ctypes.create_unicode_buffer(buffer_size)
-                    query_full_process_image_name_w = kernel32_dll.QueryFullProcessImageNameW
-                    success = query_full_process_image_name_w(process_handle, 0, buffer,
-                                                                                ctypes.byref(
-                                                                                    ctypes.c_ulong(buffer_size)))
-                    close_handle = kernel32_dll.CloseHandle
-                    close_handle(process_handle)
+            entry = ProcessCheckEntry32()
+            entry.dwSize = ctypes.sizeof(ProcessCheckEntry32)
 
-                    if success:
-                        process_name_actual = os.path.basename(buffer.value)
-                        if process_name_actual in process_names:
-                            return True
-            return False
+            found = False
+            if kernel32.Process32First(h_snapshot, ctypes.byref(entry)):
+                while True:
+                    exe_name = entry.szExeFile.decode(errors='ignore')
+                    if exe_name.lower() == process_name.lower():
+                        found = True
+                        break
+                    if not kernel32.Process32Next(h_snapshot, ctypes.byref(entry)):
+                        break
 
+            kernel32.CloseHandle(h_snapshot)
+            return found
         except Exception as e:
             self.exception_msg = f"is_process_running {e}"
             self.finished.emit()
@@ -347,8 +345,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 133 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.3.3")
+        self.current_version = 134 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.3.4")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -1002,13 +1000,10 @@ class MainWindow(QMainWindow):
             self.monitor.main_process = os.path.basename(path)
             self.monitor.found_process = True
             self.monitor.manual_hdr = True
-            self.monitor.check_hdr_state()
-            hdr_status = self.monitor.toggle_state
 
-            if not hdr_status:
-                self.monitor.toggle_hdr(True)
-                if self.monitor.noti_state:
-                    self.show_notification(True)
+            self.monitor.toggle_hdr(True)
+            if self.monitor.noti_state:
+                self.show_notification(True)
 
             self.process_launch_thread.run = lambda: subprocess.run(path, cwd=os.path.dirname(path),
                                                                     shell=True, check=True)
@@ -1155,9 +1150,6 @@ class MainWindow(QMainWindow):
                 self.create_actions()
                 self.update_classes_variables()
                 self.remove_refresh_data(selected_text)
-
-                if self.monitor.toggle_state and self.monitor.found_process:
-                    self.monitor.found_process = False
 
             else:
                 self.exception_msg = "Nothing to remove."
