@@ -11,9 +11,9 @@ PyAutoActions automates HDR management for your games and applications, enabling
 - **Game Launcher**: Launch games directly from the system tray to ensure HDR settings are correctly applied.
 - **Compatibility**: Works in tandem with ForceAutoHDR for games not officially supported by AutoHDR.
 
-![1 2 4](https://github.com/user-attachments/assets/2ba64a3f-289d-406a-898a-700a3f5a638a)
+<img width="677" height="484" alt="135" src="https://github.com/user-attachments/assets/e7c2837e-058d-46c9-9bd7-c158c423dba8" />
 
-![System Tray Example](https://github.com/user-attachments/assets/9022fb66-ce10-45cd-9b81-454cc707de53)
+<img width="187" height="137" alt="135tray" src="https://github.com/user-attachments/assets/e63c40fe-cbc5-4db3-afce-6b087f44c310" />
 
 ## Refresh Rate Switching
 - **`Enable Refresh Rate Switching` when toggled on user will be asked to enter target refresh value everytime user adds a new exe.**
