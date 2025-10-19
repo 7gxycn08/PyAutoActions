@@ -1,8 +1,8 @@
 from PySide6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget,
                                QPushButton, QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout,
                                QListWidgetItem, QSizePolicy, QInputDialog)
-from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup, QMouseEvent
-from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QObject, QThread
+from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup
+from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QThread
 from pathlib import Path
 from PIL import Image
 from RefreshRateSwitch import DevMode
@@ -150,15 +150,6 @@ class ProcessMonitor(QWidget):
                             self.notification.emit(False)
                         break
 
-                    elif self.reverse_toggle == "Always On":
-                        self.found_process = True
-                        self.main_process = base_process
-                        self.toggle_hdr(True)  # Enable HDR at process launch
-
-                        if self.noti_state:
-                            self.notification.emit(True)
-                        break
-
         except Exception as e:
             self.shutting_down = True
             self.exception_msg = f"process_check: {e}"
@@ -298,17 +289,6 @@ class BitMapInfoHeaders(ctypes.Structure):
                 ("biClrImportant", ctypes.c_uint)]
 
 
-class RightClickBlocker(QObject):
-    def eventFilter(self, source, event):
-        if isinstance(event, QMouseEvent):
-            if event.button() == Qt.MouseButton.RightButton:
-                # swallow every right-click globally
-                return True
-            if event.button() == Qt.MouseButton.LeftButton:
-                return False
-        return super().eventFilter(source, event)
-
-
 class MainWindow(QMainWindow):
     warning_signal = Signal()
     update_signal = Signal()
@@ -345,8 +325,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 134 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.3.4")
+        self.current_version = 135 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.3.5")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -408,11 +388,7 @@ class MainWindow(QMainWindow):
         self.hdr2sdr.setCheckable(True)
         self.hdr2sdr.triggered.connect(lambda: self.update_reverse("HDR To SDR"))
 
-        self.respect_global_hdr = QAction('Respect Global Settings', self.reverse_toggle_menu)
-        self.respect_global_hdr.setCheckable(True)
-        self.respect_global_hdr.triggered.connect(lambda: self.update_reverse("Always On"))
-
-        self.reverse_toggle_menu.addActions([self.sdr2hdr, self.hdr2sdr, self.respect_global_hdr])
+        self.reverse_toggle_menu.addActions([self.sdr2hdr, self.hdr2sdr])
 
         self.action_group = QActionGroup(self)
         self.action_group.addAction(self.low_delay)
@@ -424,7 +400,6 @@ class MainWindow(QMainWindow):
         self.action_group_2 = QActionGroup(self)
         self.action_group_2.addAction(self.sdr2hdr)
         self.action_group_2.addAction(self.hdr2sdr)
-        self.action_group_2.addAction(self.respect_global_hdr)
         self.action_group_2.setExclusive(True)
         self.action_group_2.triggered.connect(self.save_group_settings_2)
 
@@ -439,6 +414,9 @@ class MainWindow(QMainWindow):
         self.list_widget = QListWidget()
         size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.list_widget.setSizePolicy(size_policy)
+        self.list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.list_widget.customContextMenuRequested.connect(self.show_qlw_context_menu)
+        self.list_widget.itemDoubleClicked.connect(self.double_click_run)
 
         self.add_button = QPushButton('Add Application')
         self.remove_button = QPushButton('Remove Application')
@@ -775,6 +753,20 @@ class MainWindow(QMainWindow):
             self.refresh_rate_entry()
 
 
+    def show_qlw_context_menu(self, pos):
+        item = self.list_widget.itemAt(pos)
+        if item is None:
+            return  # Only show menu if an item is clicked
+
+        menu = QMenu()
+        set_refresh_action = menu.addAction("Set Refresh Rate")
+        action = menu.exec(self.list_widget.mapToGlobal(pos))
+
+        if action == set_refresh_action:
+            self.current_file_path = item.text()
+            self.refresh_rate_entry()
+
+
     def refresh_rate_entry(self):
         refresh_dialog = QInputDialog(self)
         refresh_dialog.setWindowTitle("PyAutoActions")
@@ -995,6 +987,10 @@ class MainWindow(QMainWindow):
             self.warning_signal.emit()
 
 
+    def double_click_run(self):
+        self.on_action_triggered(self.list_widget.currentItem().text())
+
+
     def on_action_triggered(self, path):
         try:
             self.monitor.main_process = os.path.basename(path)
@@ -1105,8 +1101,6 @@ class MainWindow(QMainWindow):
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
             self.show_window()
         elif reason == QSystemTrayIcon.ActivationReason.Context:
-            app.removeEventFilter(blocker)
-            app.installEventFilter(blocker)
             self.menu.show()
 
 
@@ -1272,12 +1266,8 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == "__main__":
-    with open(r'Resources\custom.css', 'r') as file:
-        stylesheet = file.read()
     app = QApplication(sys.argv)
-    blocker = RightClickBlocker()
-    app.installEventFilter(blocker)
     app.setQuitOnLastWindowClosed(False)
-    app.setStyleSheet(stylesheet)
+    app.setStyle("Fusion")
     window = MainWindow()
     sys.exit(app.exec())
