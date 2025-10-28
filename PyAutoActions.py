@@ -159,18 +159,23 @@ class ProcessMonitor(QWidget):
 
     def toggle_hdr(self, enable):
         try:
+            if self.is_refresh:
+                if self.reverse_toggle == "SDR To HDR":
+                    if enable:
+                        self.switch_refresh_rate()
+                    else:
+                        self.switch_back_refresh_rate()
+                elif self.reverse_toggle == "HDR To SDR":
+                    if not enable:
+                        self.switch_refresh_rate()
+                    else:
+                        self.switch_back_refresh_rate()
+
             if self.primary_monitor:
-                if enable:
-                    self.switch_refresh_rate()
-                else:
-                    self.switch_back_refresh_rate()
                 self.SetPrimaryHDRState(enable)
             else:
-                if enable:
-                    self.switch_refresh_rate()
-                else:
-                    self.switch_back_refresh_rate()
                 self.SetGlobalHDRState(enable)
+
         except Exception as e:
             self.exception_msg = f"toggle_hdr: {e}"
             self.finished.emit()
@@ -304,7 +309,7 @@ class MainWindow(QMainWindow):
         self.dropped_file_path = None
         self.current_file_path = None
         self.refresh = None
-
+        self.reverse_status = None
         self.exception_msg = None
         self.update_msg = None
         self.ICON_SIZE = 64
@@ -325,8 +330,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 135 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.3.5")
+        self.current_version = 136 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.3.6")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -688,6 +693,7 @@ class MainWindow(QMainWindow):
         else:
             pass
         self.monitor.reverse_toggle = status
+        self.reverse_status = status
 
 
     def warning_box(self):
@@ -996,10 +1002,15 @@ class MainWindow(QMainWindow):
             self.monitor.main_process = os.path.basename(path)
             self.monitor.found_process = True
             self.monitor.manual_hdr = True
+            self.monitor.reverse_toggle = self.reverse_status
 
-            self.monitor.toggle_hdr(True)
             if self.monitor.noti_state:
-                self.show_notification(True)
+                if self.reverse_status == "HDR To SDR":
+                    self.show_notification(False)
+                    self.monitor.toggle_hdr(False)
+                else:
+                    self.show_notification(True)
+                    self.monitor.toggle_hdr(True)
 
             self.process_launch_thread.run = lambda: subprocess.run(path, cwd=os.path.dirname(path),
                                                                     shell=True, check=True)
