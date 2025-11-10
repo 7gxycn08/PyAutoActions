@@ -2,9 +2,11 @@ from PySide6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout
                                QPushButton, QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout,
                                QListWidgetItem, QSizePolicy, QInputDialog)
 from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup
-from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QThread
+from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QThread, QTimer
 from pathlib import Path
 from PIL import Image
+
+from DisplayChangeMonitor import kernel32
 from RefreshRateSwitch import DevMode
 import json
 import sys
@@ -18,6 +20,7 @@ import urllib.request
 import time
 import subprocess
 import winsound
+
 
 
 class ProcessCheckEntry32(ctypes.Structure):
@@ -241,8 +244,6 @@ class ProcessMonitor(QWidget):
     # noinspection PyTypeChecker
     def is_process_running(self, process_name: str) -> bool:
         try:
-            kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
-
             # Take a snapshot of all processes
             h_snapshot = kernel32.CreateToolhelp32Snapshot(0x00000002, 0)
             if h_snapshot == wintypes.HANDLE(-1).value:
@@ -293,11 +294,28 @@ class BitMapInfoHeaders(ctypes.Structure):
                 ("biClrUsed", ctypes.c_uint),
                 ("biClrImportant", ctypes.c_uint)]
 
+# noinspection SpellCheckingInspection
+class WNDCLASS(ctypes.Structure):
+    _fields_ = [
+        ("style", wintypes.UINT),
+        ("lpfnWndProc", ctypes.WINFUNCTYPE(ctypes.c_long,
+                                           wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)),
+        ("cbClsExtra", ctypes.c_int),
+        ("cbWndExtra", ctypes.c_int),
+        ("hInstance", wintypes.HINSTANCE),
+        ("hIcon", wintypes.HANDLE),
+        ("hCursor", wintypes.HANDLE),
+        ("hbrBackground", wintypes.HANDLE),
+        ("lpszMenuName", wintypes.LPCWSTR),
+        ("lpszClassName", wintypes.LPCWSTR),
+    ]
+
 
 class MainWindow(QMainWindow):
     warning_signal = Signal()
     update_signal = Signal()
     refresh_signal = Signal()
+    display_change_signal = Signal()
 
     def __init__(self):
         super().__init__()
@@ -305,6 +323,7 @@ class MainWindow(QMainWindow):
         self.warning_signal.connect(self.warning_box, Qt.ConnectionType.QueuedConnection)
         self.update_signal.connect(self.update_box, Qt.ConnectionType.QueuedConnection)
         self.refresh_signal.connect(self.refresh_box, Qt.ConnectionType.QueuedConnection)
+        self.display_change_signal.connect(self.prewarm_window, Qt.ConnectionType.QueuedConnection)
         self.setAcceptDrops(True)
         self.dropped_file_path = None
         self.current_file_path = None
@@ -316,7 +335,9 @@ class MainWindow(QMainWindow):
         self.action_names = []
         self.monitor_thread = None
         self.boot_status = None
+        self.display_change_flag = True
 
+        self.display_change_thread = QThread()
         self.monitor_thread = QThread()
         self.update_thread = QThread()
         self.process_launch_thread = QThread()
@@ -330,8 +351,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 136 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.3.6")
+        self.current_version = 137 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.3.7")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -504,6 +525,8 @@ class MainWindow(QMainWindow):
         self.monitor_thread.run = self.monitor.process_monitor
         self.monitor_thread.start()
         self.monitor.delay = delay  # Update process monitor so it stays in sync upon restarts.
+        self.display_change_thread.run = self.display_change_monitor
+        self.display_change_thread.start()
         # noinspection SpellCheckingInspection
         self.monitor.noti_state = notify
         self.load_processes_from_config()
@@ -525,6 +548,60 @@ class MainWindow(QMainWindow):
         self.restore_group_settings_3()
         self.update_delay(delay)
         self.update_reverse(mode)
+
+
+    # --- window procedure ---
+    def wnd_proc(self, hwnd: int, msg: int, wparam: int, lparam: int) -> int:
+        user32 = ctypes.WinDLL("user32")
+        if msg == 0x007E:
+            self.display_change_signal.emit()
+        elif msg == 0x0002:
+            user32.PostQuitMessage(0)
+        return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+
+
+    # noinspection SpellCheckingInspection
+    def display_change_monitor(self):
+        user_32 = ctypes.WinDLL("user32")
+        h_instance = kernel32.GetModuleHandleW(None)
+        class_name = "DisplayWatch"
+
+        wndclass = WNDCLASS()
+        wndclass.style = 0x0002 | 0x0001
+        wnd_proc_type = ctypes.WINFUNCTYPE(ctypes.c_long,
+                                         wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
+        wnd_proc_c = wnd_proc_type(self.wnd_proc)
+        wndclass.lpfnWndProc = wnd_proc_c
+        wndclass.hInstance = h_instance
+        wndclass.lpszClassName = class_name
+        wndclass.hIcon = None
+        wndclass.hCursor = None
+        wndclass.hbrBackground = None
+        wndclass.lpszMenuName = None
+        wndclass.cbClsExtra = wndclass.cbWndExtra = 0
+
+        if not user_32.RegisterClassW(ctypes.byref(wndclass)):
+            raise ctypes.WinError()
+
+        hwnd = user_32.CreateWindowExW(
+            0, class_name, "hidden", 0,
+            0, 0, 0, 0,
+            0, 0, h_instance, None
+        )
+        if not hwnd:
+            raise ctypes.WinError()
+
+        msg = wintypes.MSG()
+        while self.display_change_flag:  # check flag each iteration
+            while user_32.PeekMessageW(ctypes.byref(msg), 0, 0, 0, 1):
+                user_32.TranslateMessage(ctypes.byref(msg))
+                user_32.DispatchMessageW(ctypes.byref(msg))
+            time.sleep(0.01)  # small sleep to avoid 100% CPU
+
+
+    def prewarm_window(self):
+        self.show_window()
+        QTimer.singleShot(50, self.hide)
 
 
     def dragEnterEvent(self, event):
@@ -675,6 +752,7 @@ class MainWindow(QMainWindow):
 
     def start_hidden_check(self):
         if self.start_hidden_checked:
+            self.prewarm_window()
             self.hide()
         else:
             self.center_window()
@@ -1117,6 +1195,8 @@ class MainWindow(QMainWindow):
 
     def close_tray_icon(self):
         if self.exit_confirm_box() == QMessageBox.StandardButton.Yes:
+            self.display_change_flag = False
+            self.display_change_thread.wait()
             self.monitor.shutting_down = True
             self.tray_icon.setToolTip("Shutting Down")
             self.window().hide()
