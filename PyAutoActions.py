@@ -5,8 +5,6 @@ from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup
 from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QThread, QTimer
 from pathlib import Path
 from PIL import Image
-
-from DisplayChangeMonitor import kernel32
 from RefreshRateSwitch import DevMode
 import json
 import sys
@@ -22,6 +20,9 @@ import subprocess
 import winsound
 
 
+
+KERNEL_32 = ctypes.WinDLL("kernel32")
+USER_32 = ctypes.WinDLL("user32")
 
 class ProcessCheckEntry32(ctypes.Structure):
     _fields_ = [
@@ -55,7 +56,6 @@ class ProcessMonitor(QWidget):
         self.noti_state = None
         self.is_refresh = is_refresh
         self.current_refresh_rate = None
-        self.user32 = ctypes.WinDLL('user32', use_last_error=True)
         self.ENUM_CURRENT_SETTINGS = -1
         self.CDS_UPDATE_REGISTRY = 0x01
         self.DISPLAY_CHANGE_SUCCESSFUL = 0
@@ -211,11 +211,11 @@ class ProcessMonitor(QWidget):
                 target_refresh_rate = self.get_refresh_from_json()
                 dev_mode = DevMode()
                 dev_mode.dmSize = ctypes.sizeof(DevMode)
-                self.user32.EnumDisplaySettingsW(None, self.ENUM_CURRENT_SETTINGS, ctypes.byref(dev_mode))
+                USER_32.EnumDisplaySettingsW(None, self.ENUM_CURRENT_SETTINGS, ctypes.byref(dev_mode))
                 self.current_refresh_rate = dev_mode.dmDisplayFrequency
                 dev_mode.dmDisplayFrequency = int(target_refresh_rate)
                 dev_mode.dmFields = 0x400000
-                result = self.user32.ChangeDisplaySettingsExW(None, ctypes.byref(dev_mode), None,
+                result = USER_32.ChangeDisplaySettingsExW(None, ctypes.byref(dev_mode), None,
                                                               self.CDS_UPDATE_REGISTRY, None)
                 if result == self.DISPLAY_CHANGE_SUCCESSFUL:
                     pass
@@ -232,7 +232,7 @@ class ProcessMonitor(QWidget):
                 dev_mode.dmSize = ctypes.sizeof(DevMode)
                 dev_mode.dmDisplayFrequency = int(self.current_refresh_rate)
                 dev_mode.dmFields = 0x400000
-                result = self.user32.ChangeDisplaySettingsExW(None, ctypes.byref(dev_mode), None,
+                result = USER_32.ChangeDisplaySettingsExW(None, ctypes.byref(dev_mode), None,
                                                               self.CDS_UPDATE_REGISTRY, None)
                 if result == self.DISPLAY_CHANGE_SUCCESSFUL:
                     pass
@@ -245,7 +245,7 @@ class ProcessMonitor(QWidget):
     def is_process_running(self, process_name: str) -> bool:
         try:
             # Take a snapshot of all processes
-            h_snapshot = kernel32.CreateToolhelp32Snapshot(0x00000002, 0)
+            h_snapshot = KERNEL_32.CreateToolhelp32Snapshot(0x00000002, 0)
             if h_snapshot == wintypes.HANDLE(-1).value:
                 raise ctypes.WinError(ctypes.get_last_error())
 
@@ -253,16 +253,16 @@ class ProcessMonitor(QWidget):
             entry.dwSize = ctypes.sizeof(ProcessCheckEntry32)
 
             found = False
-            if kernel32.Process32First(h_snapshot, ctypes.byref(entry)):
+            if KERNEL_32.Process32First(h_snapshot, ctypes.byref(entry)):
                 while True:
                     exe_name = entry.szExeFile.decode(errors='ignore')
                     if exe_name.lower() == process_name.lower():
                         found = True
                         break
-                    if not kernel32.Process32Next(h_snapshot, ctypes.byref(entry)):
+                    if not KERNEL_32.Process32Next(h_snapshot, ctypes.byref(entry)):
                         break
 
-            kernel32.CloseHandle(h_snapshot)
+            KERNEL_32.CloseHandle(h_snapshot)
             return found
         except Exception as e:
             self.exception_msg = f"is_process_running {e}"
@@ -351,8 +351,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 137 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.3.7")
+        self.current_version = 138 # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.3.8")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -562,8 +562,7 @@ class MainWindow(QMainWindow):
 
     # noinspection SpellCheckingInspection
     def display_change_monitor(self):
-        user_32 = ctypes.WinDLL("user32")
-        h_instance = kernel32.GetModuleHandleW(None)
+        h_instance = KERNEL_32.GetModuleHandleW(None)
         class_name = "DisplayWatch"
 
         wndclass = WNDCLASS()
@@ -580,10 +579,10 @@ class MainWindow(QMainWindow):
         wndclass.lpszMenuName = None
         wndclass.cbClsExtra = wndclass.cbWndExtra = 0
 
-        if not user_32.RegisterClassW(ctypes.byref(wndclass)):
+        if not USER_32.RegisterClassW(ctypes.byref(wndclass)):
             raise ctypes.WinError()
 
-        hwnd = user_32.CreateWindowExW(
+        hwnd = USER_32.CreateWindowExW(
             0, class_name, "hidden", 0,
             0, 0, 0, 0,
             0, 0, h_instance, None
@@ -593,9 +592,9 @@ class MainWindow(QMainWindow):
 
         msg = wintypes.MSG()
         while self.display_change_flag:  # check flag each iteration
-            while user_32.PeekMessageW(ctypes.byref(msg), 0, 0, 0, 1):
-                user_32.TranslateMessage(ctypes.byref(msg))
-                user_32.DispatchMessageW(ctypes.byref(msg))
+            while USER_32.PeekMessageW(ctypes.byref(msg), 0, 0, 0, 1):
+                USER_32.TranslateMessage(ctypes.byref(msg))
+                USER_32.DispatchMessageW(ctypes.byref(msg))
             time.sleep(0.01)  # small sleep to avoid 100% CPU
 
 
