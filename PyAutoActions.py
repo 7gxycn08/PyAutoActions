@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout
                                QPushButton, QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout,
                                QListWidgetItem, QSizePolicy, QInputDialog)
 from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup
-from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QThread, QTimer
+from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QThread
 from pathlib import Path
 from PIL import Image
 from RefreshRateSwitch import DevMode
@@ -597,10 +597,11 @@ class MainWindow(QMainWindow):
                 USER_32.DispatchMessageW(ctypes.byref(msg))
             time.sleep(0.01)  # small sleep to avoid 100% CPU
 
-
     def prewarm_window(self):
-        self.show_window()
-        QTimer.singleShot(50, self.hide)
+        self.move(-10000, -10000)  # off-screen
+        self.show()
+        self.hide()
+        self.center_window()
 
 
     def dragEnterEvent(self, event):
@@ -651,10 +652,10 @@ class MainWindow(QMainWindow):
     def center_window(self):
         screen = app.primaryScreen()
         screen_geometry = screen.availableGeometry()
-        window_geometry = self.frameGeometry()
-        x = (screen_geometry.width() - window_geometry.width()) // 2
-        y = (screen_geometry.height() - window_geometry.height()) // 2
-        self.move(x, y)
+        frame_geom = self.frameGeometry()
+        center_point = screen_geometry.center()  # Center of the screen
+        frame_geom.moveCenter(center_point)  # Move the window's frame to screen center
+        self.move(frame_geom.topLeft())  # Position the window
 
 
     def check_for_update(self):
