@@ -886,20 +886,9 @@ class MainWindow(QMainWindow):
             with open(file_path, "w") as f:
                 json.dump(existing_data, f, indent=4)
         else:
-            self.exception_msg = "save_command_args_info: Unexpected Error Occurred."
-            self.warning_signal.emit()
-            count = self.list_widget.count()
-            if count > 0:
-                last_item = self.list_widget.takeItem(count - 1)
-                selected_text = last_item.text()
-                exe_index_to_remove = self.process_list.index(selected_text)
-                self.delete_submenu_action(exe_index_to_remove)
-                self.process_list.pop(exe_index_to_remove)
-                self.save_config()
-                self.list_widget.takeItem(self.list_widget.row(last_item))
-                self.create_actions()
-                self.update_classes_variables()
-                del last_item
+            last_item = self.list_widget.currentItem()
+            selected_text = last_item.text()
+            self.remove_data_entry(os.path.basename(selected_text))
 
     def save_refresh_info(self, refresh_rate):
         if refresh_rate.isdigit():
@@ -922,20 +911,9 @@ class MainWindow(QMainWindow):
             with open(file_path, "w") as f:
                 json.dump(existing_data, f, indent=4)
         else:
-            self.exception_msg = "save_refresh_info: Refresh Value Not a Valid Number."
-            self.warning_signal.emit()
-            count = self.list_widget.count()
-            if count > 0:
-                last_item = self.list_widget.takeItem(count - 1)
-                selected_text = last_item.text()
-                exe_index_to_remove = self.process_list.index(selected_text)
-                self.delete_submenu_action(exe_index_to_remove)
-                self.process_list.pop(exe_index_to_remove)
-                self.save_config()
-                self.list_widget.takeItem(self.list_widget.row(last_item))
-                self.create_actions()
-                self.update_classes_variables()
-                del last_item
+            last_item = self.list_widget.currentItem()
+            selected_text = last_item.text()
+            self.remove_data_entry(os.path.basename(selected_text))
 
     def extract_icon(self, file_path, icon_index=0):
         try:
