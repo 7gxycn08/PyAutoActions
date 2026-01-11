@@ -19,10 +19,9 @@ import time
 import subprocess
 import winsound
 
-
-
 KERNEL_32 = ctypes.WinDLL("kernel32")
 USER_32 = ctypes.WinDLL("user32")
+
 
 class ProcessCheckEntry32(ctypes.Structure):
     _fields_ = [
@@ -37,6 +36,7 @@ class ProcessCheckEntry32(ctypes.Structure):
         ('dwFlags', wintypes.DWORD),
         ('szExeFile', wintypes.CHAR * 260),
     ]
+
 
 class ProcessMonitor(QWidget):
     finished = Signal()
@@ -60,7 +60,6 @@ class ProcessMonitor(QWidget):
         self.CDS_UPDATE_REGISTRY = 0x01
         self.DISPLAY_CHANGE_SUCCESSFUL = 0
 
-
         self.finished.connect(self.on_finished_show_msg, Qt.ConnectionType.QueuedConnection)
         self.process_thread = QThread()
         self.process_list = process_list
@@ -77,7 +76,6 @@ class ProcessMonitor(QWidget):
         self.is_hdr_running = self.hdr_switch.GetGlobalHDRState
         self.is_hdr_running.restype = ctypes.c_bool
 
-
     @staticmethod
     def get_appdata_path(filename):
         appdata_dir = os.environ['APPDATA']
@@ -88,7 +86,6 @@ class ProcessMonitor(QWidget):
             os.makedirs(full_path)
 
         return os.path.join(full_path, filename)
-
 
     def process_monitor(self):
         while not self.shutting_down:
@@ -128,7 +125,6 @@ class ProcessMonitor(QWidget):
                 self.finished.emit()
                 break
 
-
     def process_check(self):
         try:
             for process in self.process_list:
@@ -159,7 +155,6 @@ class ProcessMonitor(QWidget):
             self.finished.emit()
             return
 
-
     def toggle_hdr(self, enable):
         try:
             if self.is_refresh:
@@ -183,7 +178,6 @@ class ProcessMonitor(QWidget):
             self.exception_msg = f"toggle_hdr: {e}"
             self.finished.emit()
 
-
     def check_json_data(self):
         json_path = self.get_appdata_path("refresh_rate_data.json")
         with open(json_path) as f:
@@ -194,7 +188,6 @@ class ProcessMonitor(QWidget):
         else:
             return False
 
-
     def get_refresh_from_json(self):
         json_path = self.get_appdata_path("refresh_rate_data.json")
         with open(json_path) as f:
@@ -202,7 +195,6 @@ class ProcessMonitor(QWidget):
 
         refresh_rate = data[self.main_process]
         return refresh_rate
-
 
     def switch_refresh_rate(self):
         if self.is_refresh:
@@ -216,13 +208,12 @@ class ProcessMonitor(QWidget):
                 dev_mode.dmDisplayFrequency = int(target_refresh_rate)
                 dev_mode.dmFields = 0x400000
                 result = USER_32.ChangeDisplaySettingsExW(None, ctypes.byref(dev_mode), None,
-                                                              self.CDS_UPDATE_REGISTRY, None)
+                                                          self.CDS_UPDATE_REGISTRY, None)
                 if result == self.DISPLAY_CHANGE_SUCCESSFUL:
                     pass
                 else:
                     self.exception_msg = f"switch_refresh_rate: Failed to change refresh_rate"
                     self.finished.emit()
-
 
     def switch_back_refresh_rate(self):
         if self.is_refresh:
@@ -233,13 +224,12 @@ class ProcessMonitor(QWidget):
                 dev_mode.dmDisplayFrequency = int(self.current_refresh_rate)
                 dev_mode.dmFields = 0x400000
                 result = USER_32.ChangeDisplaySettingsExW(None, ctypes.byref(dev_mode), None,
-                                                              self.CDS_UPDATE_REGISTRY, None)
+                                                          self.CDS_UPDATE_REGISTRY, None)
                 if result == self.DISPLAY_CHANGE_SUCCESSFUL:
                     pass
                 else:
                     self.exception_msg = f"switch_back_refresh_rate: Failed to change refresh_rate"
                     self.finished.emit()
-
 
     # noinspection PyTypeChecker
     def is_process_running(self, process_name: str) -> bool:
@@ -269,7 +259,6 @@ class ProcessMonitor(QWidget):
             self.finished.emit()
             return False
 
-
     def on_finished_show_msg(self):
         warning_message_box = QMessageBox()
         warning_message_box.setWindowTitle("PyAutoActions Error")
@@ -293,6 +282,7 @@ class BitMapInfoHeaders(ctypes.Structure):
                 ("biYPixelsPerMeter", ctypes.c_int),
                 ("biClrUsed", ctypes.c_uint),
                 ("biClrImportant", ctypes.c_uint)]
+
 
 # noinspection SpellCheckingInspection
 class WNDCLASS(ctypes.Structure):
@@ -351,8 +341,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 138 # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.3.8")
+        self.current_version = 139  # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.3.9")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -376,7 +366,7 @@ class MainWindow(QMainWindow):
         self.about_in_menu_bar.triggered.connect(self.about_page)
         self.exit_from_menu_bar = QAction(QIcon(r"Resources\exit.ico"), 'Exit Application', self)
         self.exit_from_menu_bar.triggered.connect(self.close_tray_icon)
-        self.file_menu.addActions([self.check_for_update_action,self.notifications_action,
+        self.file_menu.addActions([self.check_for_update_action, self.notifications_action,
                                    self.refresh_rate_switching_action,
                                    self.about_in_menu_bar, self.exit_from_menu_bar])
 
@@ -533,7 +523,6 @@ class MainWindow(QMainWindow):
         self.create_actions()
         self.monitor.notification.connect(self.show_notification)
 
-
         if monitors == "All Monitors":
             self.all_monitors()
         else:
@@ -549,7 +538,6 @@ class MainWindow(QMainWindow):
         self.update_delay(delay)
         self.update_reverse(mode)
 
-
     # --- window procedure ---
     def wnd_proc(self, hwnd: int, msg: int, wparam: int, lparam: int) -> int:
         user32 = ctypes.WinDLL("user32")
@@ -559,7 +547,6 @@ class MainWindow(QMainWindow):
             user32.PostQuitMessage(0)
         return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
-
     # noinspection SpellCheckingInspection
     def display_change_monitor(self):
         h_instance = KERNEL_32.GetModuleHandleW(None)
@@ -568,7 +555,7 @@ class MainWindow(QMainWindow):
         wndclass = WNDCLASS()
         wndclass.style = 0x0002 | 0x0001
         wnd_proc_type = ctypes.WINFUNCTYPE(ctypes.c_long,
-                                         wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
+                                           wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
         wnd_proc_c = wnd_proc_type(self.wnd_proc)
         wndclass.lpfnWndProc = wnd_proc_c
         wndclass.hInstance = h_instance
@@ -603,13 +590,11 @@ class MainWindow(QMainWindow):
         self.hide()
         self.center_window()
 
-
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():  # Files are sent as URLs
             event.acceptProposedAction()
         else:
             event.ignore()
-
 
     def dropEvent(self, event):
         urls = event.mimeData().urls()
@@ -620,7 +605,6 @@ class MainWindow(QMainWindow):
             # Confirm action
             event.acceptProposedAction()
             self.add_exe()
-
 
     def show_notification(self, status):
         if status:
@@ -638,16 +622,13 @@ class MainWindow(QMainWindow):
                 5000  # duration in ms
             )
 
-
     def all_monitors(self):
         self.monitor.global_monitors = True
         self.monitor.primary_monitor = False
 
-
     def primary_monitor(self):
         self.monitor.primary_monitor = True
         self.monitor.global_monitors = False
-
 
     def center_window(self):
         screen = app.primaryScreen()
@@ -656,7 +637,6 @@ class MainWindow(QMainWindow):
         center_point = screen_geometry.center()  # Center of the screen
         frame_geom.moveCenter(center_point)  # Move the window's frame to screen center
         self.move(frame_geom.topLeft())  # Position the window
-
 
     def check_for_update(self):
         update_url = "https://raw.githubusercontent.com/7gxycn08/PyAutoActions/main/current_version.txt"
@@ -672,7 +652,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.exception_msg = f"Check_For_Update Error: {e}"
             self.warning_signal.emit()
-
 
     def save_update_settings(self):
         if self.check_for_update_action.isChecked():
@@ -697,13 +676,11 @@ class MainWindow(QMainWindow):
             self.settings.setValue("refresh_rate_switching", False)
             self.monitor.is_refresh = False
 
-
     def save_group_settings(self):
         for action in self.action_group.actions():
             if action.isChecked():
                 self.settings.setValue("GroupSettings", action.text())
                 break
-
 
     def save_group_settings_2(self):
         for action in self.action_group_2.actions():
@@ -711,13 +688,11 @@ class MainWindow(QMainWindow):
                 self.settings.setValue("GroupSettings2", action.text())
                 break
 
-
     def save_group_settings_3(self):
         for action in self.action_group_3.actions():
             if action.isChecked():
                 self.settings.setValue("GroupSettings3", action.text())
                 break
-
 
     def restore_group_settings(self):
         checked_action = self.settings.value("GroupSettings", "High")
@@ -726,14 +701,12 @@ class MainWindow(QMainWindow):
                 action.setChecked(True)
                 break
 
-
     def restore_group_settings_2(self):
         checked_action = self.settings.value("GroupSettings2", "SDR To HDR")
         for action in self.action_group_2.actions():
             if action.text() == checked_action:
                 action.setChecked(True)
                 break
-
 
     def restore_group_settings_3(self):
         checked_action = self.settings.value("GroupSettings3", "All Monitors")
@@ -749,7 +722,6 @@ class MainWindow(QMainWindow):
                 action.setChecked(True)
                 break
 
-
     def start_hidden_check(self):
         if self.start_hidden_checked:
             self.prewarm_window()
@@ -758,10 +730,8 @@ class MainWindow(QMainWindow):
             self.center_window()
             self.show()
 
-
     def update_delay(self, delay):
         self.monitor.delay = delay
-
 
     def update_reverse(self, status):
         if status == "SDR To HDR":
@@ -772,7 +742,6 @@ class MainWindow(QMainWindow):
             pass
         self.monitor.reverse_toggle = status
         self.reverse_status = status
-
 
     def warning_box(self):
         warning_message_box = QMessageBox(self)
@@ -788,7 +757,6 @@ class MainWindow(QMainWindow):
         y = (screen_geometry.height() - warning_message_box.height()) // 2
         warning_message_box.move(x, y)
         warning_message_box.exec()
-
 
     def update_box(self):
         update_message_box = QMessageBox(self)
@@ -807,12 +775,10 @@ class MainWindow(QMainWindow):
         update_message_box.finished.connect(self.on_update_box_finished)
         update_message_box.exec()
 
-
-    def on_update_box_finished(self, result): # noqa
+    def on_update_box_finished(self, result):  # noqa
         if result == QMessageBox.StandardButton.Yes:
             subprocess.Popen("start https://github.com/7gxycn08/PyAutoActions/releases",
                              shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
-
 
     def refresh_box(self):
         refresh_message_box = QMessageBox(self)
@@ -831,11 +797,9 @@ class MainWindow(QMainWindow):
         refresh_message_box.finished.connect(self.on_refresh_box_finished)
         refresh_message_box.exec()
 
-
     def on_refresh_box_finished(self, result):
         if result == QMessageBox.StandardButton.Yes:
             self.refresh_rate_entry()
-
 
     def show_qlw_context_menu(self, pos):
         item = self.list_widget.itemAt(pos)
@@ -844,12 +808,30 @@ class MainWindow(QMainWindow):
 
         menu = QMenu()
         set_refresh_action = menu.addAction("Set Refresh Rate")
+        set_command_action = menu.addAction("Set Command Args")
         action = menu.exec(self.list_widget.mapToGlobal(pos))
 
         if action == set_refresh_action:
             self.current_file_path = item.text()
             self.refresh_rate_entry()
+        elif action == set_command_action:
+            self.current_file_path = item.text()
+            self.command_args_entry()
 
+    def command_args_entry(self):
+        command_args = QInputDialog(self)
+        command_args.setWindowTitle("PyAutoActions")
+        command_args.setLabelText("Enter Command Args:")
+        command_args.setWindowIcon(QIcon(r"Resources\main.ico"))
+        command_args.setFixedSize(400, 200)
+        command_args.textValueSelected.connect(self.save_command_args_info)
+        winsound.MessageBeep()
+        screen = app.primaryScreen()
+        screen_geometry = screen.availableGeometry()
+        x = (screen_geometry.width() - command_args.width()) // 2
+        y = (screen_geometry.height() - command_args.height()) // 2
+        command_args.move(x, y)
+        command_args.show()  # Non-blocking
 
     def refresh_rate_entry(self):
         refresh_dialog = QInputDialog(self)
@@ -865,7 +847,6 @@ class MainWindow(QMainWindow):
         y = (screen_geometry.height() - refresh_dialog.height()) // 2
         refresh_dialog.move(x, y)
         refresh_dialog.show()  # Non-blocking
-
 
     def exit_confirm_box(self):
         exit_message_box = QMessageBox(self)
@@ -884,6 +865,41 @@ class MainWindow(QMainWindow):
         result = exit_message_box.exec()
         return result
 
+    def save_command_args_info(self, command_args):
+        if command_args:
+            json_path = self.get_appdata_path("command_args_data.json")
+            file_path = Path(json_path)
+            base_exe = os.path.basename(self.current_file_path)
+            data = {f"{base_exe}": f"{command_args}"}  # new or updated values
+
+            # Step 1: Load existing data if file exists
+            if file_path.exists():
+                with open(file_path, "r") as f:
+                    existing_data = json.load(f)
+            else:
+                existing_data = {}
+
+            # Step 2: Update existing data
+            existing_data.update(data)
+
+            # Step 3: Save back to file
+            with open(file_path, "w") as f:
+                json.dump(existing_data, f, indent=4)
+        else:
+            self.exception_msg = "save_command_args_info: Unexpected Error Occurred."
+            self.warning_signal.emit()
+            count = self.list_widget.count()
+            if count > 0:
+                last_item = self.list_widget.takeItem(count - 1)
+                selected_text = last_item.text()
+                exe_index_to_remove = self.process_list.index(selected_text)
+                self.delete_submenu_action(exe_index_to_remove)
+                self.process_list.pop(exe_index_to_remove)
+                self.save_config()
+                self.list_widget.takeItem(self.list_widget.row(last_item))
+                self.create_actions()
+                self.update_classes_variables()
+                del last_item
 
     def save_refresh_info(self, refresh_rate):
         if refresh_rate.isdigit():
@@ -921,8 +937,6 @@ class MainWindow(QMainWindow):
                 self.update_classes_variables()
                 del last_item
 
-
-
     def extract_icon(self, file_path, icon_index=0):
         try:
             shell32_dll = ctypes.WinDLL("shell32.dll")
@@ -936,7 +950,6 @@ class MainWindow(QMainWindow):
             return None
 
         return icon_handle
-
 
     def get_icon_as_image_object(self, file_path, icon_index=0):
         try:
@@ -996,13 +1009,11 @@ class MainWindow(QMainWindow):
             self.warning_signal.emit()
             return None
 
-
     @staticmethod
     def resize_pixmap(pixmap, width, height):
         new_size = QSize(width, height)
         return pixmap.scaled(new_size, Qt.AspectRatioMode.KeepAspectRatio,
                              Qt.TransformationMode.SmoothTransformation)
-
 
     def pil_image_to_q_icon(self, image_object):
         if image_object is None:
@@ -1017,12 +1028,10 @@ class MainWindow(QMainWindow):
             resized_pixmap = self.resize_pixmap(q_pixmap, 32, 32)
             return QIcon(resized_pixmap)
 
-
     def delete_submenu_action(self, index):
         if self.submenu.actions():
             item_to_delete = self.submenu.actions()[index]
             self.submenu.removeAction(item_to_delete)
-
 
     def create_actions(self):
         try:
@@ -1058,22 +1067,21 @@ class MainWindow(QMainWindow):
             self.exception_msg = f"create_actions: {e}"
             self.warning_signal.emit()
 
-
-    def run_as_admin(self, executable_path):
+    def run_as_admin(self, executable_path, command_exists):
         shell32_dll = ctypes.WinDLL("shell32.dll")
         shell_execute_w = shell32_dll.ShellExecuteW
         try:
             folder_path = os.path.dirname(executable_path)
-
-            shell_execute_w(None, "runas", executable_path, None, folder_path, 1)
+            if not command_exists:
+                shell_execute_w(None, "runas", executable_path, None, folder_path, 1)
+            else:
+                shell_execute_w(None, "runas", executable_path, command_exists, folder_path, 1)
         except Exception as e:
             self.exception_msg = f"run_as_admin: {e}"
             self.warning_signal.emit()
 
-
     def double_click_run(self):
         self.on_action_triggered(self.list_widget.currentItem().text())
-
 
     def on_action_triggered(self, path):
         try:
@@ -1090,21 +1098,39 @@ class MainWindow(QMainWindow):
                     self.show_notification(True)
                     self.monitor.toggle_hdr(True)
 
-            self.process_launch_thread.run = lambda: subprocess.run(path, cwd=os.path.dirname(path),
-                                                                    shell=True, check=True)
-            self.process_launch_thread.start()
+            command_exists = self.get_command_arg(os.path.basename(path))
+            if not command_exists:
+                self.process_launch_thread.run = lambda: subprocess.run(path, cwd=os.path.dirname(path),
+                                                                        shell=True, check=True)
+                self.process_launch_thread.start()
+            else:
+                self.process_launch_thread.run = lambda: subprocess.run(path, command_exists, cwd=os.path.dirname(path),
+                                                                        shell=True, check=True)
+                self.process_launch_thread.start()
 
         except subprocess.CalledProcessError:
-            self.run_as_admin_thread.run = lambda: self.run_as_admin(path)
+            self.run_as_admin_thread.run = lambda: self.run_as_admin(path, command_exists)
             self.run_as_admin_thread.start()
         except Exception as e:
             self.exception_msg = f"on_action_triggered: {e}"
             self.warning_signal.emit()
 
+    def get_command_arg(self, exe_name):
+        json_path = Path(self.get_appdata_path("command_args_data.json"))
+        if not json_path.exists():
+            return None
+        try:
+            with json_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data.get(exe_name)
+
+        except Exception as e:
+            self.exception_msg = f"get_command_arg: {e}"
+            self.warning_signal.emit()
+            return None
 
     def update_classes_variables(self):
         self.monitor.process_list = self.process_list
-
 
     def run_on_boot(self):
         checked = self.run_on_boot_action.isChecked()
@@ -1114,7 +1140,6 @@ class MainWindow(QMainWindow):
             self.add_to_startup()
         else:
             self.remove_start_shortcut()
-
 
     def remove_start_shortcut(self):
         if self.already_added_shortcut():
@@ -1133,11 +1158,9 @@ class MainWindow(QMainWindow):
                 self.exception_msg = f"remove_start_shortcut: {e}"
                 self.warning_signal.emit()
 
-
     def toggle_start_hidden(self):
         checked = self.start_hidden_action.isChecked()
         self.settings.setValue("start_hidden", checked)
-
 
     def already_added_shortcut(self):
         try:
@@ -1155,7 +1178,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.exception_msg = f"already_added_shortcut: {e}"
             self.warning_signal.emit()
-
 
     def add_to_startup(self):
         if not self.already_added_shortcut():
@@ -1179,19 +1201,16 @@ class MainWindow(QMainWindow):
                 self.exception_msg = f"add_to_startup: {e}"
                 self.warning_signal.emit()
 
-
     @staticmethod
     def about_page():
         subprocess.Popen("start https://github.com/7gxycn08/PyAutoActions",
                          shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
-
 
     def tray_icon_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
             self.show_window()
         elif reason == QSystemTrayIcon.ActivationReason.Context:
             self.menu.show()
-
 
     def close_tray_icon(self):
         if self.exit_confirm_box() == QMessageBox.StandardButton.Yes:
@@ -1203,15 +1222,20 @@ class MainWindow(QMainWindow):
             self.monitor_thread.wait()
             QCoreApplication.quit()
 
-
     def show_window(self):
         self.center_window()
         self.show()
         self.activateWindow()
 
     # noinspection PyMethodMayBeStatic
-    def remove_refresh_data(self, process_key):
+    def remove_data_entry(self, process_key):
         json_path = self.get_appdata_path("refresh_rate_data.json")
+        self.remove_data(json_path, process_key)
+        json_path = self.get_appdata_path("command_args_data.json")
+        self.remove_data(json_path, process_key)
+
+    # noinspection PyMethodMayBeStatic
+    def remove_data(self, json_path, process_key):
         with open(json_path, "r") as f:
             data = json.load(f)
         key = os.path.basename(process_key)
@@ -1219,7 +1243,6 @@ class MainWindow(QMainWindow):
             del data[key]
         with open(json_path, "w") as f:
             json.dump(data, f, indent=4)
-
 
     def remove_selected_entry(self):
         try:
@@ -1234,7 +1257,7 @@ class MainWindow(QMainWindow):
                 self.list_widget.takeItem(self.list_widget.row(selected_item))
                 self.create_actions()
                 self.update_classes_variables()
-                self.remove_refresh_data(selected_text)
+                self.remove_data_entry(selected_text)
 
             else:
                 self.exception_msg = "Nothing to remove."
@@ -1246,7 +1269,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.exception_msg = f"Nothing to remove. {e}"
             self.warning_signal.emit()
-
 
     def add_exe(self):
         try:
@@ -1293,7 +1315,6 @@ class MainWindow(QMainWindow):
             self.warning_signal.emit()
             self.dropped_file_path = None
 
-
     def load_or_create_config(self):
         config = self.config
         config_path = self.get_appdata_path("processlist.ini")
@@ -1302,13 +1323,12 @@ class MainWindow(QMainWindow):
                 with open(config_path, 'w', encoding="utf-8") as configfile:
                     config.add_section('HDR_APPS')
                     config.set('HDR_APPS', 'processes', '')
-                    config.write(configfile) # type: ignore
+                    config.write(configfile)  # type: ignore
             else:
                 config.read(config_path)
         except Exception as e:
             self.exception_msg = f"load_or_create_config: {e}"
             self.warning_signal.emit()
-
 
     @staticmethod
     def get_appdata_path(filename):
@@ -1321,19 +1341,17 @@ class MainWindow(QMainWindow):
 
         return os.path.join(full_path, filename)
 
-
     def save_config(self):
         try:
             self.list_str = ', '.join(self.process_list)
             self.config['HDR_APPS']['processes'] = self.list_str
             config_path = self.get_appdata_path('processlist.ini')
             with open(config_path, 'w') as configfile:
-                self.config.write(configfile) # type: ignore
+                self.config.write(configfile)  # type: ignore
                 self.update_classes_variables()
         except Exception as e:
             self.exception_msg = f"save_config: {e}"
             self.warning_signal.emit()
-
 
     def load_processes_from_config(self):
         try:
