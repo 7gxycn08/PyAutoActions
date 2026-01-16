@@ -1,3 +1,4 @@
 PySide6
 pywin32
 pillow
+icoextract
