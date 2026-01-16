@@ -5,6 +5,7 @@ from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup
 from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QThread
 from pathlib import Path
 from PIL import Image
+from icoextract import IconExtractor
 from RefreshRateSwitch import DevMode
 import json
 import sys
@@ -270,20 +271,6 @@ class ProcessMonitor(QWidget):
         warning_message_box.exec()
 
 
-class BitMapInfoHeaders(ctypes.Structure):
-    _fields_ = [("biSize", ctypes.c_uint),
-                ("biWidth", ctypes.c_int),
-                ("biHeight", ctypes.c_int),
-                ("biPlanes", ctypes.c_ushort),
-                ("biBitCount", ctypes.c_ushort),
-                ("biCompression", ctypes.c_uint),
-                ("biSizeImage", ctypes.c_uint),
-                ("biXPixelsPerMeter", ctypes.c_int),
-                ("biYPixelsPerMeter", ctypes.c_int),
-                ("biClrUsed", ctypes.c_uint),
-                ("biClrImportant", ctypes.c_uint)]
-
-
 # noinspection SpellCheckingInspection
 class WNDCLASS(ctypes.Structure):
     _fields_ = [
@@ -321,7 +308,6 @@ class MainWindow(QMainWindow):
         self.reverse_status = None
         self.exception_msg = None
         self.update_msg = None
-        self.ICON_SIZE = 64
         self.action_names = []
         self.monitor_thread = None
         self.boot_status = None
@@ -341,8 +327,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 139  # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.3.9")
+        self.current_version = 140  # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.4.0")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -848,14 +834,14 @@ class MainWindow(QMainWindow):
         refresh_dialog.move(x, y)
         refresh_dialog.show()  # Non-blocking
 
-    def exit_confirm_box(self):
+    def exit_confirm_box(self, message):
         exit_message_box = QMessageBox(self)
         exit_message_box.setIcon(QMessageBox.Icon.Question)
         exit_message_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         exit_message_box.setWindowTitle("PyAutoActions")
         exit_message_box.setWindowIcon(QIcon(r"Resources\main.ico"))
         exit_message_box.setFixedSize(400, 200)
-        exit_message_box.setText(f"Do you want to exit PyAutoActions?")
+        exit_message_box.setText(message)
         winsound.MessageBeep()
         screen = app.primaryScreen()
         screen_geometry = screen.availableGeometry()
@@ -929,61 +915,20 @@ class MainWindow(QMainWindow):
 
         return icon_handle
 
-    def get_icon_as_image_object(self, file_path, icon_index=0):
+    # noinspection PyMethodMayBeStatic
+    def get_icon_as_image_object(self, file_path, num=0):
         try:
-            icon_handle = self.extract_icon(file_path, icon_index)
-            user32_dll = ctypes.WinDLL("user32.dll")
-            get_dc = user32_dll.GetDC
-            destroy_icon = user32_dll.DestroyIcon
-            release_dc = user32_dll.ReleaseDC
-            draw_icon_ex = user32_dll.DrawIconEx
+            extractor = IconExtractor(file_path)
 
-            gdi32_dll = ctypes.WinDLL("gdi32")
-            create_compatible_dc = gdi32_dll.CreateCompatibleDC
-            create_compatible_bitmap = gdi32_dll.CreateCompatibleBitmap
-            select_object = gdi32_dll.SelectObject
-            get_di_bits = gdi32_dll.GetDIBits
-            delete_object = gdi32_dll.DeleteObject
-            delete_dc = gdi32_dll.DeleteDC
+            # get_icon returns a BytesIO of .ico data
+            ico_bytes = extractor.get_icon(num=num)
 
-            if icon_handle is None:
-                return None
+            # Open with Pillow directly from memory
+            img = Image.open(ico_bytes)
 
-            elif icon_handle:
-                hdc = get_dc(0)
-                mem_dc = create_compatible_dc(hdc)
-                bitmap = create_compatible_bitmap(hdc, self.ICON_SIZE, self.ICON_SIZE)
-                select_object(mem_dc, bitmap)
-
-                draw_icon_ex(
-                    mem_dc, 0, 0, icon_handle, self.ICON_SIZE, self.ICON_SIZE, 0, None, 0x0003 | 0x0008
-                )
-
-                bmp_header = BitMapInfoHeaders()
-                bmp_header.biSize = ctypes.sizeof(BitMapInfoHeaders)
-                bmp_header.biWidth = self.ICON_SIZE
-                bmp_header.biHeight = -self.ICON_SIZE
-                bmp_header.biPlanes = 1
-                bmp_header.biBitCount = 32
-                bmp_header.biCompression = 0
-
-                bmp_str = ctypes.create_string_buffer(self.ICON_SIZE * self.ICON_SIZE * 4)
-                get_di_bits(mem_dc, bitmap, 0, self.ICON_SIZE, bmp_str, ctypes.byref(bmp_header),
-                            0)
-
-                im = Image.frombuffer(
-                    'RGBA',
-                    (self.ICON_SIZE, self.ICON_SIZE),
-                    bmp_str, 'raw', 'BGRA', 0, 1)  # noqa
-
-                destroy_icon(icon_handle)
-                delete_object(bitmap)
-                delete_dc(mem_dc)
-                release_dc(0, hdc)
-
-                return im
-        except AttributeError:
-            self.exception_msg = "get_icon_as_image_object: Failed to get image object"
+            return img
+        except Exception as e:
+            self.exception_msg = f"get_icon_as_image_object: Failed to get image object {e}"
             self.warning_signal.emit()
             return None
 
@@ -1191,7 +1136,7 @@ class MainWindow(QMainWindow):
             self.menu.show()
 
     def close_tray_icon(self):
-        if self.exit_confirm_box() == QMessageBox.StandardButton.Yes:
+        if self.exit_confirm_box("Do you want to exit PyAutoActions?") == QMessageBox.StandardButton.Yes:
             self.display_change_flag = False
             self.display_change_thread.wait()
             self.monitor.shutting_down = True
@@ -1222,6 +1167,30 @@ class MainWindow(QMainWindow):
         with open(json_path, "w") as f:
             json.dump(data, f, indent=4)
 
+    def restart_program(self):
+        message = "Releasing Process Handles Requires Application Restart."
+        if self.exit_confirm_box(message) == QMessageBox.StandardButton.Yes:
+            self.display_change_flag = False
+            self.display_change_thread.wait()
+            self.monitor.shutting_down = True
+            self.tray_icon.setToolTip("Releasing Process Handles")
+            self.window().hide()
+            self.monitor_thread.wait()
+            default_path = fr"{os.getcwd()}\pyautoactions.exe"
+            program_path = os.path.exists(default_path)
+            # noinspection SpellCheckingInspection
+            subprocess.Popen(["cmd",
+                              "/c",
+                              "timeout",
+                              "/t", "3",
+                              "/nobreak",
+                              ">nul",
+                              "&&",
+                              f"{default_path if program_path else os.getcwd() + '\\PyAutoActions.py'}"],
+                             shell=True,
+                             creationflags=subprocess.CREATE_NO_WINDOW)
+            QCoreApplication.quit()
+
     def remove_selected_entry(self):
         try:
             selected_item = self.list_widget.currentItem()
@@ -1236,6 +1205,7 @@ class MainWindow(QMainWindow):
                 self.create_actions()
                 self.update_classes_variables()
                 self.remove_data_entry(selected_text)
+                self.restart_program()
 
             else:
                 self.exception_msg = "Nothing to remove."
@@ -1256,7 +1226,8 @@ class MainWindow(QMainWindow):
                 if self.refresh_rate_switching_action.isChecked() and file_path:
                     self.refresh_signal.emit()
             else:
-                file_dialog = QFileDialog()
+                file_dialog = QFileDialog(self)
+
                 file_path, _ = file_dialog.getOpenFileName(self, "Select Executable", "",
                                                            "Executable Files (*.exe)")
                 self.current_file_path = file_path
