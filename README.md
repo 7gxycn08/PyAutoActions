@@ -60,7 +60,7 @@ Your contributions make PyAutoActions better! We welcome pull requests, feature 
 
 ## Copy Right
 
-Copyright [2026] 7gxycn08@github.com
+Copyright 2026 7gxycn08@github.com
 
 Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
