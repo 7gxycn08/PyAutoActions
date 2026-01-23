@@ -36,6 +36,16 @@ PyAutoActions automates HDR management for your games and applications, enabling
 
 ## Getting Started
 
+
+![winget](https://github.com/7gxycn08/ForceAutoHDR/assets/121936658/4dd2df30-da47-4dcd-9219-396709fa6f3b)
+
+To start using PyAutoActions, download the latest release from our [Releases page](https://github.com/7gxycn08/PyAutoActions/releases). Install it using the setup file and run the application.
+
+Alternatively you can install and update via [Windows Package Manager (Winget)](https://docs.microsoft.com/en-us/windows/package-manager/winget/):
+
+
+`winget install 7gxycn08.PyAutoActions`
+
 1. **Add Games**: Use the GUI to add the executable path of your games.
 2. **Automatic HDR Management**: HDR will enable when a game/app starts and disable upon its closure.
 3. **Startup Option**: Enable running PyAutoActions at system boot via the tray icon context menu.
