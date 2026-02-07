@@ -327,8 +327,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 140  # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.4.0")
+        self.current_version = 141  # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.4.1")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -531,6 +531,12 @@ class MainWindow(QMainWindow):
             self.display_change_signal.emit()
         elif msg == 0x0002:
             user32.PostQuitMessage(0)
+        if isinstance(lparam, int):
+            # On 64-bit systems, lparam might be a pointer, so we use c_void_p
+            lparam = ctypes.c_void_p(lparam)
+        else:
+            # If it's a large integer (on a 64-bit system), use c_longlong
+            lparam = ctypes.c_longlong(lparam)
         return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
     # noinspection SpellCheckingInspection
@@ -1159,13 +1165,16 @@ class MainWindow(QMainWindow):
 
     # noinspection PyMethodMayBeStatic
     def remove_data(self, json_path, process_key):
-        with open(json_path, "r") as f:
-            data = json.load(f)
-        key = os.path.basename(process_key)
-        if key in data:
-            del data[key]
-        with open(json_path, "w") as f:
-            json.dump(data, f, indent=4)
+        if os.path.exists(json_path):
+            with open(json_path, "r") as f:
+                data = json.load(f)
+            key = os.path.basename(process_key)
+            if key in data:
+                del data[key]
+            with open(json_path, "w") as f:
+                json.dump(data, f, indent=4)
+        else:
+            return
 
     def restart_program(self):
         message = "Releasing Process Handles Requires Application Restart."
