@@ -327,8 +327,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 141  # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.4.1")
+        self.current_version = 142  # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.4.2")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -1033,7 +1033,8 @@ class MainWindow(QMainWindow):
                                                                         shell=True, check=True)
                 self.process_launch_thread.start()
             else:
-                self.process_launch_thread.run = lambda: subprocess.run(path, command_exists, cwd=os.path.dirname(path),
+                self.process_launch_thread.run = lambda: subprocess.run([path] + command_exists.split(),
+                                                                        cwd=os.path.dirname(path),
                                                                         shell=True, check=True)
                 self.process_launch_thread.start()
 
