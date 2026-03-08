@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout
 from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup
 from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QThread
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageFile
 from icoextract import IconExtractor
 from RefreshRateSwitch import DevMode
 import json
@@ -327,8 +327,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 142  # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.4.2")
+        self.current_version = 143  # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.4.3")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -923,6 +923,7 @@ class MainWindow(QMainWindow):
 
     # noinspection PyMethodMayBeStatic
     def get_icon_as_image_object(self, file_path, num=0):
+        # noinspection PyBroadException
         try:
             extractor = IconExtractor(file_path)
 
@@ -930,12 +931,11 @@ class MainWindow(QMainWindow):
             ico_bytes = extractor.get_icon(num=num)
 
             # Open with Pillow directly from memory
+            ImageFile.LOAD_TRUNCATED_IMAGES = True
             img = Image.open(ico_bytes)
 
             return img
-        except Exception as e:
-            self.exception_msg = f"get_icon_as_image_object: Failed to get image object {e}"
-            self.warning_signal.emit()
+        except Exception:
             return None
 
     @staticmethod
