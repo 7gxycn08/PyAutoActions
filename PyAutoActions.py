@@ -1,3 +1,4 @@
+import win32con
 from PySide6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget,
                                QPushButton, QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout,
                                QListWidgetItem, QSizePolicy, QInputDialog)
@@ -14,11 +15,14 @@ import configparser
 import ctypes
 import ctypes.wintypes as wintypes
 import win32com.client
+import win32process
+import win32gui
 import io
 import urllib.request
 import time
 import subprocess
 import winsound
+import psutil
 
 KERNEL_32 = ctypes.WinDLL("kernel32")
 USER_32 = ctypes.WinDLL("user32")
@@ -312,6 +316,9 @@ class MainWindow(QMainWindow):
         self.monitor_thread = None
         self.boot_status = None
         self.display_change_flag = True
+        self.found_windows = []
+        self.suspend_pid = None
+        self.resume_pid = None
 
         self.display_change_thread = QThread()
         self.monitor_thread = QThread()
@@ -327,8 +334,8 @@ class MainWindow(QMainWindow):
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
 
-        self.current_version = 143  # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.4.3")
+        self.current_version = 144  # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.4.4")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -801,14 +808,87 @@ class MainWindow(QMainWindow):
         menu = QMenu()
         set_refresh_action = menu.addAction("Set Refresh Rate")
         set_command_action = menu.addAction("Set Command Args")
+        menu.addSeparator()
+        suspend_action = menu.addAction("Suspend Process")
+        resume_action = menu.addAction("Resume Process")
+        menu.addSeparator()
+        end_action = menu.addAction("End Task")
+
         action = menu.exec(self.list_widget.mapToGlobal(pos))
 
+        self.current_file_path = item.text()
         if action == set_refresh_action:
-            self.current_file_path = item.text()
             self.refresh_rate_entry()
         elif action == set_command_action:
-            self.current_file_path = item.text()
             self.command_args_entry()
+        elif action == suspend_action:
+            self.suspend_entry()
+        elif action == resume_action:
+            self.resume_entry()
+        elif action == end_action:
+            self.exit_task()
+
+    # noinspection SpellCheckingInspection
+    def exit_task(self):
+        exe_name = os.path.basename(self.current_file_path)
+        subprocess.Popen(["taskkill", "/f", "/im", f"{exe_name}"],creationflags=subprocess.CREATE_NO_WINDOW)
+
+    def suspend_entry(self):
+        exe_name = os.path.basename(self.current_file_path)
+        if self.monitor.is_process_running(exe_name):
+            pid = self.find_pid_by_name(exe_name)
+            json_path = self.get_appdata_path("suspend_data.json")
+            file_path = Path(json_path)
+            data = {f"{exe_name}": f"{pid}"}  # new or updated values
+            # Step 1: Load existing data if file exists
+            if file_path.exists():
+                with open(file_path, "r") as f:
+                    existing_data = json.load(f)
+            else:
+                existing_data = {}
+
+            existing_data.update(data)
+            if exe_name in existing_data.items():
+                return
+            else:
+                handle = self.find_window_by_pid(pid)
+                USER_32.ShowWindow(handle, win32con.SW_MINIMIZE)
+                self.suspend_process(pid)
+                self.suspend_pid = pid
+                self.found_windows = []
+                # Step 2: Update existing data
+                existing_data.update(data)
+
+                # Step 3: Save back to file
+                with open(file_path, "w") as f:
+                    json.dump(existing_data, f, indent=4)
+
+    def resume_entry(self):
+        exe_name = os.path.basename(self.current_file_path)
+        if self.monitor.is_process_running(exe_name):
+            pid = self.find_pid_by_name(exe_name)
+            json_path = self.get_appdata_path("suspend_data.json")
+            file_path = Path(json_path)
+            data = {f"{exe_name}": f"{pid}"}  # new or updated values
+            # Step 1: Load existing data if file exists
+            if file_path.exists():
+                with open(file_path, "r") as f:
+                    existing_data = json.load(f)
+            else:
+                existing_data = {}
+
+            existing_data.update(data)
+            if exe_name in existing_data:
+                handle = self.find_window_by_pid(pid)
+                self.resume_process(pid)
+                USER_32.ShowWindowAsync(handle, win32con.SW_RESTORE)
+                self.found_windows = []
+                self.suspend_pid = None
+                del existing_data[exe_name]
+                with open(file_path, "w") as f:
+                    json.dump(existing_data, f, indent=4)
+            else:
+                return
 
     def command_args_entry(self):
         command_args = QInputDialog(self)
@@ -1013,6 +1093,8 @@ class MainWindow(QMainWindow):
         self.on_action_triggered(self.list_widget.currentItem().text())
 
     def on_action_triggered(self, path):
+        if self.monitor.found_process:
+            return
         try:
             self.monitor.main_process = os.path.basename(path)
             self.monitor.found_process = True
@@ -1331,6 +1413,47 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.exception_msg = f"load_processes_from_config: {e}"
             self.warning_signal.emit()
+
+    # Enumerate the threads and suspend them
+    # noinspection PyMethodMayBeStatic
+    def suspend_process(self, pid):
+        try:
+            process = psutil.Process(pid)
+            process.suspend()
+        except Exception as e:
+            self.exception_msg = f"suspend_process failed: {str(e)}"
+            self.warning_signal.emit()
+
+    # noinspection PyMethodMayBeStatic
+    def resume_process(self, pid):
+        try:
+            process = psutil.Process(pid)
+            process.resume()
+        except Exception as e:
+            self.exception_msg = f"resume_process failed: {str(e)}"
+            self.warning_signal.emit()
+
+    # Find the process ID by the executable name
+    # noinspection PyMethodMayBeStatic
+    def find_pid_by_name(self, exe_name):
+        for proc in psutil.process_iter(['pid', 'name']):
+            if proc.info['name'] == exe_name:
+                return proc.info['pid']
+        return None
+
+    def pid_callback(self, hwnd, pid):
+        # Get the process ID for the window (PID)
+        _, found_pid = win32process.GetWindowThreadProcessId(hwnd)
+        if found_pid == pid:
+            self.found_windows.append(hwnd)
+
+    # Find the window handle by process ID (PID)
+    def find_window_by_pid(self, pid):
+        win32gui.EnumWindows(self.pid_callback, pid)
+        if self.found_windows:
+            return self.found_windows[0]
+        else:
+            return None
 
 
 if __name__ == "__main__":
