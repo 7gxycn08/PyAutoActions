@@ -54,10 +54,9 @@ Alternatively you can install and update via [Windows Package Manager (Winget)](
 
 ## Latest Changes
 
-- Added Windows 11 24H2 support
-- Updated Python to v3.13.9
-- Fixed issue where hdr won't turn on for Nvidia GPU's
-- Added new feature Refresh Rate Switching per exe under file menu in gui enabled by default
+- Added Suspend/Resume process from gui list widget item context menu.
+- Added End Task directly from gui list widget item context menu.
+- Updated Python to v3.13.12
 
 ## Contributing
 
