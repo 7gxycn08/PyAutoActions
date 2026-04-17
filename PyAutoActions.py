@@ -2,8 +2,8 @@ import win32con
 from PySide6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget,
                                QPushButton, QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout,
                                QListWidgetItem, QSizePolicy, QInputDialog)
-from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup
-from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QThread
+from PySide6.QtGui import QIcon, QAction, QPixmap, QImage, QActionGroup, QMouseEvent
+from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QThread, QEvent
 from pathlib import Path
 from PIL import Image, ImageFile
 from icoextract import IconExtractor
@@ -49,6 +49,7 @@ class ProcessMonitor(QWidget):
 
     def __init__(self, process_list, is_refresh):
         super().__init__()
+        self.pause = None
         self.delay = None
         self.reverse_toggle = None
         self.shutting_down = False
@@ -94,41 +95,44 @@ class ProcessMonitor(QWidget):
 
     def process_monitor(self):
         while not self.shutting_down:
-            try:
-                if self.manual_hdr:
-                    time.sleep(20)
-                    self.manual_hdr = False
-
-                if not self.found_process:
-                    self.process_thread.run = self.process_check
-                    self.process_thread.start()
-                else:
-                    if not self.is_process_running(self.main_process):
-                        self.found_process = False
+            if self.pause:
+                time.sleep(3)
+            else:
+                try:
+                    if self.manual_hdr:
+                        time.sleep(20)
                         self.manual_hdr = False
-                        if self.reverse_toggle == "HDR To SDR":
-                            self.toggle_hdr(True)  # Enable HDR when process exits
-                            if self.noti_state:
-                                self.notification.emit(True)
-                        else:
-                            self.toggle_hdr(False)  # Disable HDR when process exits if "SDR To HDR"
-                            if self.noti_state:
-                                self.notification.emit(False)
 
-                # Add delay based on self.delay value
-                if self.delay == "High":
-                    time.sleep(5)
-                elif self.delay == "Medium":
-                    time.sleep(3)
-                elif self.delay == "Low":
-                    time.sleep(1)
+                    if not self.found_process:
+                        self.process_thread.run = self.process_check
+                        self.process_thread.start()
+                    else:
+                        if not self.is_process_running(self.main_process):
+                            self.found_process = False
+                            self.manual_hdr = False
+                            if self.reverse_toggle == "HDR To SDR":
+                                self.toggle_hdr(True)  # Enable HDR when process exits
+                                if self.noti_state:
+                                    self.notification.emit(True)
+                            else:
+                                self.toggle_hdr(False)  # Disable HDR when process exits if "SDR To HDR"
+                                if self.noti_state:
+                                    self.notification.emit(False)
 
-            except RuntimeError:
-                break
-            except Exception as e:
-                self.exception_msg = f"process_monitor: {e}"
-                self.finished.emit()
-                break
+                    # Add delay based on self.delay value
+                    if self.delay == "High":
+                        time.sleep(5)
+                    elif self.delay == "Medium":
+                        time.sleep(3)
+                    elif self.delay == "Low":
+                        time.sleep(1)
+
+                except RuntimeError:
+                    break
+                except Exception as e:
+                    self.exception_msg = f"process_monitor: {e}"
+                    self.finished.emit()
+                    break
 
     def process_check(self):
         try:
@@ -333,67 +337,78 @@ class MainWindow(QMainWindow):
         self.config.read(self.get_appdata_path("processlist.ini"))
         self.list_str = self.config['HDR_APPS']['processes']
         self.process_list = self.list_str.split(', ') if self.list_str else []
+        self.language_config = configparser.ConfigParser()
+        self.language_config.read(r"Resources/ui/text.ini")
 
-        self.current_version = 144  # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.4.4")
+        self.current_version = 145  # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.4.5")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
         self.menu_bar = self.menuBar()
-        self.file_menu = self.menu_bar.addMenu('File')
-        self.check_for_update_action = QAction('Check for Update on Startup', self.file_menu)
+        self.file_menu = self.menu_bar.addMenu(self.language_config["UI_TEXT"]["file_menu"])
+        self.pause_switching = QAction(self.language_config["UI_TEXT"]["pause_switching"],
+                                       self.file_menu)
+        self.pause_switching.setCheckable(True)
+        self.pause_switching.triggered.connect(self.save_update_settings)
+
+        self.check_for_update_action = QAction(self.language_config["UI_TEXT"]["check_for_update_action"],
+                                               self.file_menu)
         self.check_for_update_action.setCheckable(True)
         self.check_for_update_action.triggered.connect(self.save_update_settings)
 
-        self.notifications_action = QAction('Enable Notifications', self.file_menu)
+        self.notifications_action = QAction(self.language_config["UI_TEXT"]["notifications_action"], self.file_menu)
         self.notifications_action.setCheckable(True)
         self.notifications_action.triggered.connect(self.save_update_settings)
 
-        self.refresh_rate_switching_action = QAction("Enable Refresh Rate Switching", self.file_menu)
+        self.refresh_rate_switching_action = QAction(self.language_config["UI_TEXT"]["refresh_rate_switching_action"],
+                                                     self.file_menu)
         self.refresh_rate_switching_action.setCheckable(True)
         self.refresh_rate_switching_action.triggered.connect(self.save_update_settings)
 
         self.file_menu.addSeparator()
 
-        self.about_in_menu_bar = QAction(QIcon(r"Resources\about.ico"), 'About', self)
+        self.about_in_menu_bar = QAction(QIcon(r"Resources\about.ico"),
+                                         self.language_config["UI_TEXT"]["about_in_menu_bar"], self)
         self.about_in_menu_bar.triggered.connect(self.about_page)
-        self.exit_from_menu_bar = QAction(QIcon(r"Resources\exit.ico"), 'Exit Application', self)
+        self.exit_from_menu_bar = QAction(QIcon(r"Resources\exit.ico"),
+                                          self.language_config["UI_TEXT"]["exit_from_menu_bar"], self)
         self.exit_from_menu_bar.triggered.connect(self.close_tray_icon)
-        self.file_menu.addActions([self.check_for_update_action, self.notifications_action,
+        self.file_menu.addActions([self.pause_switching, self.check_for_update_action, self.notifications_action,
                                    self.refresh_rate_switching_action,
                                    self.about_in_menu_bar, self.exit_from_menu_bar])
 
-        self.monitor_menu = self.menu_bar.addMenu('Monitor Selection')
-        self.all_action = QAction('All Monitors', self.monitor_menu)
+        self.monitor_menu = self.menu_bar.addMenu(self.language_config["UI_TEXT"]["monitor_menu"])
+        self.all_action = QAction(self.language_config["UI_TEXT"]["all_action"], self.monitor_menu)
         self.all_action.setCheckable(True)
         self.all_action.triggered.connect(self.all_monitors)
-        self.primary_action = QAction('Primary Monitor', self.monitor_menu)
+        self.primary_action = QAction(self.language_config["UI_TEXT"]["primary_action"], self.monitor_menu)
         self.primary_action.setCheckable(True)
         self.primary_action.triggered.connect(self.primary_monitor)
         self.monitor_menu.addActions([self.all_action, self.primary_action])
 
-        self.delay_menu = self.menu_bar.addMenu('Detection')
-        self.low_delay = QAction('Low', self.delay_menu)
+        self.delay_menu = self.menu_bar.addMenu(self.language_config["UI_TEXT"]["delay_menu"])
+        self.low_delay = QAction(self.language_config["UI_TEXT"]["low_delay"], self.delay_menu)
         self.low_delay.setCheckable(True)
         self.low_delay.triggered.connect(lambda: self.update_delay("Low"))
 
-        self.medium_delay = QAction('Medium', self.delay_menu)
+        self.medium_delay = QAction(self.language_config["UI_TEXT"]["medium_delay"], self.delay_menu)
         self.medium_delay.setCheckable(True)
         self.medium_delay.triggered.connect(lambda: self.update_delay("Medium"))
 
-        self.high_delay = QAction('High', self.delay_menu)
+        self.high_delay = QAction(self.language_config["UI_TEXT"]["high_delay"], self.delay_menu)
         self.high_delay.setCheckable(True)
         self.high_delay.triggered.connect(lambda: self.update_delay("High"))
 
         self.delay_menu.addActions([self.low_delay, self.medium_delay, self.high_delay])
 
-        self.reverse_toggle_menu = self.menu_bar.addMenu('Toggle Mode')
+        self.reverse_toggle_menu = self.menu_bar.addMenu(self.language_config["UI_TEXT"]["reverse_toggle_menu"])
 
-        self.sdr2hdr = QAction('SDR To HDR', self.reverse_toggle_menu)
+        self.sdr2hdr = QAction(self.language_config["UI_TEXT"]["sdr2hdr"], self.reverse_toggle_menu)
         self.sdr2hdr.setCheckable(True)
         self.sdr2hdr.triggered.connect(lambda: self.update_reverse("SDR To HDR"))
 
-        self.hdr2sdr = QAction('HDR To SDR', self.reverse_toggle_menu)
+        self.hdr2sdr = QAction(self.language_config["UI_TEXT"]["hdr2sdr"], self.reverse_toggle_menu)
         self.hdr2sdr.setCheckable(True)
         self.hdr2sdr.triggered.connect(lambda: self.update_reverse("HDR To SDR"))
 
@@ -421,14 +436,15 @@ class MainWindow(QMainWindow):
         self.central_widget = QWidget(self)
         self.setCentralWidget(self.central_widget)
         self.list_widget = QListWidget()
+        self.list_widget.viewport().installEventFilter(self)
         size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.list_widget.setSizePolicy(size_policy)
         self.list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.list_widget.customContextMenuRequested.connect(self.show_qlw_context_menu)
         self.list_widget.itemDoubleClicked.connect(self.double_click_run)
 
-        self.add_button = QPushButton('Add Application')
-        self.remove_button = QPushButton('Remove Application')
+        self.add_button = QPushButton(self.language_config["UI_TEXT"]["add_button"])
+        self.remove_button = QPushButton(self.language_config["UI_TEXT"]["remove_button"])
 
         self.add_button.setFixedSize(150, 25)
         self.remove_button.setFixedSize(150, 25)
@@ -459,19 +475,19 @@ class MainWindow(QMainWindow):
         self.tray_icon.activated.connect(self.tray_icon_activated)
         self.tray_icon.setContextMenu(self.menu)
 
-        self.submenu = QMenu('Game Launcher', self.menu)
+        self.submenu = QMenu(self.language_config["UI_TEXT"]["submenu"], self.menu)
         self.submenu.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.submenu.setWindowFlags(self.menu.windowFlags() | Qt.WindowType.FramelessWindowHint)
         self.submenu.setIcon(QIcon(r"Resources\main.ico"))
         self.menu.addMenu(self.submenu)
         self.menu.addSeparator()
 
-        self.start_hidden_action = QAction('Start In Tray', self.menu)
+        self.start_hidden_action = QAction(self.language_config["UI_TEXT"]["start_hidden_action"], self.menu)
         self.start_hidden_action.setCheckable(True)
         self.start_hidden_action.setChecked(bool(self.settings.value("start_hidden", defaultValue=False, type=bool)))
         self.start_hidden_action.triggered.connect(self.toggle_start_hidden)
 
-        self.run_on_boot_action = QAction('Run on System Boot', self.menu)
+        self.run_on_boot_action = QAction(self.language_config["UI_TEXT"]["run_on_boot_action"], self.menu)
         self.run_on_boot_action.setCheckable(True)
         if self.already_added_shortcut():
             self.run_on_boot_action.setChecked(True)
@@ -479,10 +495,10 @@ class MainWindow(QMainWindow):
             self.run_on_boot_action.setChecked(False)
         self.run_on_boot_action.triggered.connect(self.run_on_boot)
 
-        self.about_button = QAction(QIcon(r"Resources\about.ico"), 'About')
+        self.about_button = QAction(QIcon(r"Resources\about.ico"), self.language_config["UI_TEXT"]["about_button"])
         self.about_button.triggered.connect(self.about_page)
 
-        self.action_exit = QAction(QIcon(r"Resources\exit.ico"), 'Exit')
+        self.action_exit = QAction(QIcon(r"Resources\exit.ico"), self.language_config["UI_TEXT"]["action_exit"])
         self.action_exit.triggered.connect(self.close_tray_icon)
 
         self.menu.addActions([self.start_hidden_action, self.run_on_boot_action, self.about_button, self.action_exit])
@@ -497,8 +513,10 @@ class MainWindow(QMainWindow):
         monitors = self.settings.value("GroupSettings3", defaultValue="All Monitors")
         update = self.settings.value("check_for_updates", defaultValue=True, type=bool)
         notify = self.settings.value("notifications", defaultValue=True, type=bool)
+        pause = self.settings.value("pause_switching", defaultValue=False, type=bool)
         refresh = self.settings.value("refresh_rate_switching", defaultValue=True, type=bool)
 
+        self.pause_switching.setChecked(bool(pause))
         self.check_for_update_action.setChecked(bool(update))
         self.notifications_action.setChecked(bool(notify))
         self.refresh_rate_switching_action.setChecked(bool(refresh))
@@ -508,6 +526,7 @@ class MainWindow(QMainWindow):
         self.monitor_thread.run = self.monitor.process_monitor
         self.monitor_thread.start()
         self.monitor.delay = delay  # Update process monitor so it stays in sync upon restarts.
+        self.monitor.pause = pause
         self.display_change_thread.run = self.display_change_monitor
         self.display_change_thread.start()
         # noinspection SpellCheckingInspection
@@ -530,6 +549,15 @@ class MainWindow(QMainWindow):
         self.restore_group_settings_3()
         self.update_delay(delay)
         self.update_reverse(mode)
+
+    def eventFilter(self, source, event):
+        if source is self.list_widget.viewport() and event.type() == QEvent.Type.MouseButtonPress:
+            if isinstance(event, QMouseEvent):
+                item = self.list_widget.itemAt(event.position().toPoint())
+                if item is None:
+                    self.list_widget.clearFocus()
+                    self.list_widget.clearSelection()
+        return super().eventFilter(source, event)
 
     # --- window procedure ---
     def wnd_proc(self, hwnd: int, msg: int, wparam: int, lparam: int) -> int:
@@ -674,6 +702,12 @@ class MainWindow(QMainWindow):
         else:
             self.settings.setValue("refresh_rate_switching", False)
             self.monitor.is_refresh = False
+        if self.pause_switching.isChecked():
+            self.settings.setValue("pause_switching", True)
+            self.monitor.pause = True
+        else:
+            self.settings.setValue("pause_switching", False)
+            self.monitor.pause = False
 
     def save_group_settings(self):
         for action in self.action_group.actions():
@@ -1096,29 +1130,61 @@ class MainWindow(QMainWindow):
         if self.monitor.found_process:
             return
         try:
-            self.monitor.main_process = os.path.basename(path)
-            self.monitor.found_process = True
-            self.monitor.manual_hdr = True
-            self.monitor.reverse_toggle = self.reverse_status
-
-            if self.monitor.noti_state:
-                if self.reverse_status == "HDR To SDR":
-                    self.show_notification(False)
-                    self.monitor.toggle_hdr(False)
+            if self.pause_switching.isChecked():
+                command_exists = self.get_command_arg(os.path.basename(path))
+                if not command_exists:
+                    try:
+                        self.process_launch_thread.run = lambda: subprocess.run(path, cwd=os.path.dirname(path),
+                                                                                shell=True,
+                                                                                stderr=subprocess.DEVNULL,
+                                                                                stdout=subprocess.DEVNULL)
+                        self.process_launch_thread.start()
+                    except subprocess.CalledProcessError:
+                        pass
                 else:
-                    self.show_notification(True)
-                    self.monitor.toggle_hdr(True)
-
-            command_exists = self.get_command_arg(os.path.basename(path))
-            if not command_exists:
-                self.process_launch_thread.run = lambda: subprocess.run(path, cwd=os.path.dirname(path),
-                                                                        shell=True, check=True)
-                self.process_launch_thread.start()
+                    try:
+                        self.process_launch_thread.run = lambda: subprocess.run([path] + command_exists.split(),
+                                                                                cwd=os.path.dirname(path),
+                                                                                shell=True,
+                                                                                stderr=subprocess.DEVNULL,
+                                                                                stdout=subprocess.DEVNULL)
+                        self.process_launch_thread.start()
+                    except subprocess.CalledProcessError:
+                        pass
             else:
-                self.process_launch_thread.run = lambda: subprocess.run([path] + command_exists.split(),
-                                                                        cwd=os.path.dirname(path),
-                                                                        shell=True, check=True)
-                self.process_launch_thread.start()
+                self.monitor.main_process = os.path.basename(path)
+                self.monitor.found_process = True
+                self.monitor.manual_hdr = True
+                self.monitor.reverse_toggle = self.reverse_status
+
+                if self.monitor.noti_state:
+                    if self.reverse_status == "HDR To SDR":
+                        self.show_notification(False)
+                        self.monitor.toggle_hdr(False)
+                    else:
+                        self.show_notification(True)
+                        self.monitor.toggle_hdr(True)
+
+                command_exists = self.get_command_arg(os.path.basename(path))
+                if not command_exists:
+                    try:
+                        self.process_launch_thread.run = lambda: subprocess.run(path, cwd=os.path.dirname(path),
+                                                                                shell=True,
+                                                                                stderr=subprocess.DEVNULL,
+                                                                                stdout=subprocess.DEVNULL)
+                        self.process_launch_thread.start()
+                    except subprocess.CalledProcessError:
+                        pass
+                else:
+                    try:
+                        self.process_launch_thread.run = lambda: subprocess.run([path] + command_exists.split(),
+                                                                                cwd=os.path.dirname(path),
+                                                                                shell=True,
+                                                                                stderr=subprocess.DEVNULL,
+                                                                                stdout=subprocess.DEVNULL)
+                        self.process_launch_thread.start()
+                    except subprocess.CalledProcessError:
+                        pass
 
         except subprocess.CalledProcessError:
             self.run_as_admin_thread.run = lambda: self.run_as_admin(path, command_exists)
@@ -1460,5 +1526,9 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     app.setStyle("Fusion")
-    window = MainWindow()
+    try:
+        window = MainWindow()
+    except Exception as gui_load:
+        QMessageBox.critical(None, "Startup failed", f"{type(gui_load).__name__}: {gui_load}")
+        exit(-1)
     sys.exit(app.exec())
