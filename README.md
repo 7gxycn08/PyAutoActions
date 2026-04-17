@@ -56,7 +56,8 @@ Alternatively you can install and update via [Windows Package Manager (Winget)](
 
 - Added Suspend/Resume process from gui list widget item context menu.
 - Added End Task directly from gui list widget item context menu.
-- Updated Python to v3.13.12
+- Added manual pause toggle for hdr/sdr switching.
+- Updated Python to v3.14.4
 
 ## Contributing
 
