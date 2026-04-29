@@ -340,8 +340,8 @@ class MainWindow(QMainWindow):
         self.language_config = configparser.ConfigParser()
         self.language_config.read(r"Resources/ui/text.ini")
 
-        self.current_version = 145  # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.4.5")
+        self.current_version = 146  # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.4.6")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -865,7 +865,7 @@ class MainWindow(QMainWindow):
     # noinspection SpellCheckingInspection
     def exit_task(self):
         exe_name = os.path.basename(self.current_file_path)
-        subprocess.Popen(["taskkill", "/f", "/im", f"{exe_name}"],creationflags=subprocess.CREATE_NO_WINDOW)
+        subprocess.Popen(["taskkill", "/f", "/im", f"{exe_name}"], creationflags=subprocess.CREATE_NO_WINDOW)
 
     def suspend_entry(self):
         exe_name = os.path.basename(self.current_file_path)
@@ -1021,36 +1021,28 @@ class MainWindow(QMainWindow):
             selected_text = last_item.text()
             self.remove_data_entry(os.path.basename(selected_text))
 
-    def extract_icon(self, file_path, icon_index=0):
-        try:
-            shell32_dll = ctypes.WinDLL("shell32.dll")
-            extract_icon_w = shell32_dll.ExtractIconW
-            icon_handle = extract_icon_w(0, file_path, icon_index)
-            if icon_handle <= 1:
-                return None
-        except Exception as e:
-            self.exception_msg = f"extract_icon: {e}"
-            self.warning_signal.emit()
-            return None
-
-        return icon_handle
-
     # noinspection PyMethodMayBeStatic
     def get_icon_as_image_object(self, file_path, num=0):
         # noinspection PyBroadException
+        extractor = None
+        # noinspection PyBroadException
         try:
             extractor = IconExtractor(file_path)
-
-            # get_icon returns a BytesIO of .ico data
             ico_bytes = extractor.get_icon(num=num)
 
-            # Open with Pillow directly from memory
             ImageFile.LOAD_TRUNCATED_IMAGES = True
-            img = Image.open(ico_bytes)
 
-            return img
+            with Image.open(ico_bytes) as img:
+                img.load()
+                return img.copy()
+        # noinspection PyBroadException
         except Exception:
             return None
+
+        finally:
+            if extractor is not None and hasattr(extractor, "_pe"):
+                # noinspection PyProtectedMember
+                extractor._pe.close()
 
     @staticmethod
     def resize_pixmap(pixmap, width, height):
@@ -1325,30 +1317,6 @@ class MainWindow(QMainWindow):
         else:
             return
 
-    def restart_program(self):
-        message = "Releasing Process Handles Requires Application Restart."
-        if self.exit_confirm_box(message) == QMessageBox.StandardButton.Yes:
-            self.display_change_flag = False
-            self.display_change_thread.wait()
-            self.monitor.shutting_down = True
-            self.tray_icon.setToolTip("Releasing Process Handles")
-            self.window().hide()
-            self.monitor_thread.wait()
-            default_path = fr"{os.getcwd()}\pyautoactions.exe"
-            program_path = os.path.exists(default_path)
-            # noinspection SpellCheckingInspection
-            subprocess.Popen(["cmd",
-                              "/c",
-                              "timeout",
-                              "/t", "3",
-                              "/nobreak",
-                              ">nul",
-                              "&&",
-                              f"{default_path if program_path else os.getcwd() + '\\PyAutoActions.py'}"],
-                             shell=True,
-                             creationflags=subprocess.CREATE_NO_WINDOW)
-            QCoreApplication.quit()
-
     def remove_selected_entry(self):
         try:
             selected_item = self.list_widget.currentItem()
@@ -1363,7 +1331,6 @@ class MainWindow(QMainWindow):
                 self.create_actions()
                 self.update_classes_variables()
                 self.remove_data_entry(selected_text)
-                self.restart_program()
 
             else:
                 self.exception_msg = "Nothing to remove."
