@@ -1,4 +1,3 @@
-import win32con
 from PySide6.QtWidgets import (QMenu, QSystemTrayIcon, QApplication, QVBoxLayout, QListWidget,
                                QPushButton, QFileDialog, QMainWindow, QWidget, QMessageBox, QHBoxLayout,
                                QListWidgetItem, QSizePolicy, QInputDialog)
@@ -8,6 +7,9 @@ from pathlib import Path
 from PIL import Image, ImageFile
 from icoextract import IconExtractor
 from RefreshRateSwitch import DevMode
+from winrt.windows.devices.radios import Radio, RadioKind, RadioState
+import win32con
+import asyncio
 import json
 import sys
 import os
@@ -51,6 +53,7 @@ class ProcessMonitor(QWidget):
         super().__init__()
         self.pause = None
         self.delay = None
+        self.bluetooth_flag = None
         self.reverse_toggle = None
         self.shutting_down = False
         self.manual_hdr = None
@@ -164,6 +167,24 @@ class ProcessMonitor(QWidget):
             self.finished.emit()
             return
 
+    # noinspection PyMethodMayBeStatic
+    async def bluetooth_on(self):
+        radios = await Radio.get_radios_async()
+
+        for radio in radios:
+            if radio.kind == RadioKind.BLUETOOTH:
+                if radio.state != RadioState.ON:
+                    await radio.set_state_async(RadioState.ON)
+
+    # noinspection PyMethodMayBeStatic
+    async def bluetooth_off(self):
+        radios = await Radio.get_radios_async()
+
+        for radio in radios:
+            if radio.kind == RadioKind.BLUETOOTH:
+                if radio.state == RadioState.ON:
+                    await radio.set_state_async(RadioState.OFF)
+
     def toggle_hdr(self, enable):
         try:
             if self.is_refresh:
@@ -180,8 +201,17 @@ class ProcessMonitor(QWidget):
 
             if self.primary_monitor:
                 self.SetPrimaryHDRState(enable)
+                if self.bluetooth_flag is True and enable is True:
+                    asyncio.run(self.bluetooth_on())
+                else:
+                    asyncio.run(self.bluetooth_off())
+
             else:
                 self.SetGlobalHDRState(enable)
+                if self.bluetooth_flag is True and enable is True:
+                    asyncio.run(self.bluetooth_on())
+                else:
+                    asyncio.run(self.bluetooth_off())
 
         except Exception as e:
             self.exception_msg = f"toggle_hdr: {e}"
@@ -344,8 +374,8 @@ class MainWindow(QMainWindow):
         self.language_config = configparser.ConfigParser()
         self.language_config.read(r"Resources/ui/text.ini")
 
-        self.current_version = 147  # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.4.7")
+        self.current_version = 148  # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.4.8")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -370,6 +400,11 @@ class MainWindow(QMainWindow):
         self.refresh_rate_switching_action.setCheckable(True)
         self.refresh_rate_switching_action.triggered.connect(self.save_update_settings)
 
+        self.bluetooth_on_action = QAction(self.language_config["UI_TEXT"]["bluetooth_enable"],
+                                          self.file_menu)
+        self.bluetooth_on_action.setCheckable(True)
+        self.bluetooth_on_action.triggered.connect(self.save_update_settings)
+
         self.file_menu.addSeparator()
 
         self.about_in_menu_bar = QAction(QIcon(r"Resources\about.ico"),
@@ -379,7 +414,7 @@ class MainWindow(QMainWindow):
                                           self.language_config["UI_TEXT"]["exit_from_menu_bar"], self)
         self.exit_from_menu_bar.triggered.connect(self.close_tray_icon)
         self.file_menu.addActions([self.pause_switching, self.check_for_update_action, self.notifications_action,
-                                   self.refresh_rate_switching_action,
+                                   self.refresh_rate_switching_action,self.bluetooth_on_action,
                                    self.about_in_menu_bar, self.exit_from_menu_bar])
 
         self.monitor_menu = self.menu_bar.addMenu(self.language_config["UI_TEXT"]["monitor_menu"])
@@ -519,11 +554,13 @@ class MainWindow(QMainWindow):
         notify = self.settings.value("notifications", defaultValue=True, type=bool)
         pause = self.settings.value("pause_switching", defaultValue=False, type=bool)
         refresh = self.settings.value("refresh_rate_switching", defaultValue=True, type=bool)
+        bluetooth = self.settings.value("bluetooth_switch", defaultValue=True, type=bool)
 
         self.pause_switching.setChecked(bool(pause))
         self.check_for_update_action.setChecked(bool(update))
         self.notifications_action.setChecked(bool(notify))
         self.refresh_rate_switching_action.setChecked(bool(refresh))
+        self.bluetooth_on_action.setChecked(bool(bluetooth))
 
         self.monitor = ProcessMonitor(self.process_list, refresh)
 
@@ -712,6 +749,12 @@ class MainWindow(QMainWindow):
         else:
             self.settings.setValue("pause_switching", False)
             self.monitor.pause = False
+        if self.bluetooth_on_action.isChecked():
+            self.settings.setValue("bluetooth_switch", True)
+            self.monitor.bluetooth_flag = True
+        else:
+            self.settings.setValue("bluetooth_switch", False)
+            self.monitor.bluetooth_flag = False
 
     def save_group_settings(self):
         for action in self.action_group.actions():

@@ -3,3 +3,5 @@ pywin32
 pillow
 icoextract
 psutil
+winrt-runtime[all]
+winrt-Windows.Devices.Radios[all]
