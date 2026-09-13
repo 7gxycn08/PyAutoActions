@@ -212,8 +212,9 @@ class ProcessMonitor(QWidget):
                 if self.mouse_flag is True and enable is True:
                     self.mouse_block_thread.run = block_mouse
                     self.mouse_block_thread.start()
-                if enable is False and self.mouse_block_thread.isRunning():
-                    MouseBlock.loop_control = False
+                else:
+                    MouseBlock.mouse_brake_flag = True
+                    self.mouse_block_thread.wait()
 
             else:
                 self.SetGlobalHDRState(enable)
@@ -221,6 +222,12 @@ class ProcessMonitor(QWidget):
                     asyncio.run(self.bluetooth_on())
                 else:
                     asyncio.run(self.bluetooth_off())
+                if self.mouse_flag is True and enable is True:
+                    self.mouse_block_thread.run = block_mouse
+                    self.mouse_block_thread.start()
+                else:
+                    MouseBlock.mouse_brake_flag = True
+                    self.mouse_block_thread.wait()
 
         except Exception as e:
             self.exception_msg = f"toggle_hdr: {e}"
@@ -584,6 +591,7 @@ class MainWindow(QMainWindow):
         self.monitor.delay = delay  # Update process monitor so it stays in sync upon restarts.
         self.monitor.pause = pause
         self.monitor.bluetooth_flag = bluetooth
+        self.monitor.mouse_flag = mouse
         self.display_change_thread.run = self.display_change_monitor
         self.display_change_thread.start()
         # noinspection SpellCheckingInspection
@@ -1240,6 +1248,7 @@ class MainWindow(QMainWindow):
         self.on_action_triggered(self.list_widget.currentItem().text())
 
     def on_action_triggered(self, path):
+        self.save_update_settings()
         if self.monitor.found_process:
             return
         try:
