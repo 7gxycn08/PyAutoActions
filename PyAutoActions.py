@@ -6,6 +6,8 @@ from PySide6.QtCore import QCoreApplication, QSettings, Qt, QSize, Signal, QThre
 from pathlib import Path
 from PIL import Image, ImageFile
 from icoextract import IconExtractor
+from MouseBlock import block_mouse
+import MouseBlock
 from RefreshRateSwitch import DevMode
 from winrt.windows.devices.radios import Radio, RadioKind, RadioState
 import win32con
@@ -54,6 +56,7 @@ class ProcessMonitor(QWidget):
         self.pause = None
         self.delay = None
         self.bluetooth_flag = None
+        self.mouse_flag = None
         self.reverse_toggle = None
         self.shutting_down = False
         self.manual_hdr = None
@@ -71,6 +74,7 @@ class ProcessMonitor(QWidget):
 
         self.finished.connect(self.on_finished_show_msg, Qt.ConnectionType.QueuedConnection)
         self.process_thread = QThread()
+        self.mouse_block_thread = QThread()
         self.process_list = process_list
 
         self.hdr_switch = ctypes.CDLL(r"Dependency\HDRSwitch.dll")
@@ -205,6 +209,11 @@ class ProcessMonitor(QWidget):
                     asyncio.run(self.bluetooth_on())
                 else:
                     asyncio.run(self.bluetooth_off())
+                if self.mouse_flag is True and enable is True:
+                    self.mouse_block_thread.run = block_mouse
+                    self.mouse_block_thread.start()
+                if enable is False and self.mouse_block_thread.isRunning():
+                    MouseBlock.loop_control = False
 
             else:
                 self.SetGlobalHDRState(enable)
@@ -405,6 +414,10 @@ class MainWindow(QMainWindow):
         self.bluetooth_on_action.setCheckable(True)
         self.bluetooth_on_action.triggered.connect(self.save_update_settings)
 
+        self.mouse_block_action = QAction(self.language_config["UI_TEXT"]["block_mouse"], self.file_menu)
+        self.mouse_block_action.setCheckable(True)
+        self.mouse_block_action.triggered.connect(self.save_update_settings)
+
         self.file_menu.addSeparator()
 
         self.about_in_menu_bar = QAction(QIcon(r"Resources\about.ico"),
@@ -414,7 +427,7 @@ class MainWindow(QMainWindow):
                                           self.language_config["UI_TEXT"]["exit_from_menu_bar"], self)
         self.exit_from_menu_bar.triggered.connect(self.close_tray_icon)
         self.file_menu.addActions([self.pause_switching, self.check_for_update_action, self.notifications_action,
-                                   self.refresh_rate_switching_action,self.bluetooth_on_action,
+                                   self.refresh_rate_switching_action,self.bluetooth_on_action,self.mouse_block_action,
                                    self.about_in_menu_bar, self.exit_from_menu_bar])
 
         self.monitor_menu = self.menu_bar.addMenu(self.language_config["UI_TEXT"]["monitor_menu"])
@@ -555,12 +568,14 @@ class MainWindow(QMainWindow):
         pause = self.settings.value("pause_switching", defaultValue=False, type=bool)
         refresh = self.settings.value("refresh_rate_switching", defaultValue=True, type=bool)
         bluetooth = self.settings.value("bluetooth_switch", defaultValue=True, type=bool)
+        mouse = self.settings.value("mouse_block", defaultValue=True, type=bool)
 
         self.pause_switching.setChecked(bool(pause))
         self.check_for_update_action.setChecked(bool(update))
         self.notifications_action.setChecked(bool(notify))
         self.refresh_rate_switching_action.setChecked(bool(refresh))
         self.bluetooth_on_action.setChecked(bool(bluetooth))
+        self.mouse_block_action.setChecked(bool(mouse))
 
         self.monitor = ProcessMonitor(self.process_list, refresh)
 
@@ -568,6 +583,7 @@ class MainWindow(QMainWindow):
         self.monitor_thread.start()
         self.monitor.delay = delay  # Update process monitor so it stays in sync upon restarts.
         self.monitor.pause = pause
+        self.monitor.bluetooth_flag = bluetooth
         self.display_change_thread.run = self.display_change_monitor
         self.display_change_thread.start()
         # noinspection SpellCheckingInspection
@@ -755,6 +771,12 @@ class MainWindow(QMainWindow):
         else:
             self.settings.setValue("bluetooth_switch", False)
             self.monitor.bluetooth_flag = False
+        if self.mouse_block_action.isChecked():
+            self.settings.setValue("mouse_block", True)
+            self.monitor.mouse_flag = True
+        else:
+            self.settings.setValue("mouse_block", False)
+            self.monitor.mouse_flag = False
 
     def save_group_settings(self):
         for action in self.action_group.actions():
