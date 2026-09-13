@@ -34,6 +34,16 @@ def change_flag(flag):
 # Register the Win key ONCE when the script starts
 keyboard.on_press_key('win', lambda _: change_flag(True))
 
+def hide_mouse():
+    try:
+        user32.SetProcessDPIAware()
+    except AttributeError:
+        pass
+    width = user32.GetSystemMetrics(0)
+    height = user32.GetSystemMetrics(1)
+    off_x = width + 1
+    off_y = height + 1
+    user32.SetCursorPos(off_x, off_y)
 
 def block_mouse():
     global mouse_brake_flag
@@ -47,6 +57,7 @@ def block_mouse():
     if not hook_id:
         return
 
+    hide_mouse()
     try:
         msg = wintypes.MSG()
         while True:  # loop_control is redundant if we use mouse_brake_flag
@@ -66,10 +77,3 @@ def block_mouse():
         user32.UnhookWindowsHookEx(hook_id)
         # DO NOT call keyboard.unhook_all() here,
         # otherwise the 'win' key stops working for the next time you call block_mouse()
-
-
-if __name__ == "__main__":
-    while True:
-        block_mouse()
-        # Small delay between runs to prevent "Win" key ghosting
-        time.sleep(0.5)
