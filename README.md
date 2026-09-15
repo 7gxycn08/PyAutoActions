@@ -54,10 +54,9 @@ Alternatively you can install and update via [Windows Package Manager (Winget)](
 
 ## Latest Changes
 
-- Added Suspend/Resume process from gui list widget item context menu.
-- Added End Task directly from gui list widget item context menu.
-- Added manual pause toggle for hdr/sdr switching.
-- Updated Python to v3.14.4
+- Added enable bluetooth at game/app start and disable upon exit under File menu (for bluetooth controllers/headphones etc).
+- Added disable mouse globally toggle at game/app start and disable upon exit under File menu. 
+- Updated Python to v3.14.7
 
 ## Contributing
 
