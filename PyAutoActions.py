@@ -207,12 +207,12 @@ class ProcessMonitor(QWidget):
                 self.SetPrimaryHDRState(enable)
                 if self.bluetooth_flag is True and enable is True:
                     asyncio.run(self.bluetooth_on())
-                else:
+                if self.bluetooth_flag is True and enable is False:
                     asyncio.run(self.bluetooth_off())
                 if self.mouse_flag is True and enable is True:
                     self.mouse_block_thread.run = block_mouse
                     self.mouse_block_thread.start()
-                else:
+                if self.mouse_flag is True and enable is False:
                     MouseBlock.mouse_brake_flag = True
                     self.mouse_block_thread.wait()
 
@@ -220,12 +220,12 @@ class ProcessMonitor(QWidget):
                 self.SetGlobalHDRState(enable)
                 if self.bluetooth_flag is True and enable is True:
                     asyncio.run(self.bluetooth_on())
-                else:
+                if self.bluetooth_flag is True and enable is False:
                     asyncio.run(self.bluetooth_off())
                 if self.mouse_flag is True and enable is True:
                     self.mouse_block_thread.run = block_mouse
                     self.mouse_block_thread.start()
-                else:
+                if self.mouse_flag is True and enable is False:
                     MouseBlock.mouse_brake_flag = True
                     self.mouse_block_thread.wait()
 
@@ -390,8 +390,8 @@ class MainWindow(QMainWindow):
         self.language_config = configparser.ConfigParser()
         self.language_config.read(r"Resources/ui/text.ini")
 
-        self.current_version = 148  # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.4.8")
+        self.current_version = 149  # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.4.9")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
