@@ -30,6 +30,7 @@ import psutil
 
 KERNEL_32 = ctypes.WinDLL("kernel32")
 USER_32 = ctypes.WinDLL("user32")
+SHELL_32 = ctypes.WinDLL("shell32")
 
 
 class ProcessCheckEntry32(ctypes.Structure):
@@ -390,8 +391,8 @@ class MainWindow(QMainWindow):
         self.language_config = configparser.ConfigParser()
         self.language_config.read(r"Resources/ui/text.ini")
 
-        self.current_version = 149  # Version Checking Number.
-        self.setWindowTitle("PyAutoActions v1.4.9")
+        self.current_version = 150  # Version Checking Number.
+        self.setWindowTitle("PyAutoActions v1.5.0")
         self.setWindowIcon(QIcon(os.path.abspath(r"Resources\main.ico")))
         self.setGeometry(100, 100, 600, 400)
 
@@ -614,6 +615,10 @@ class MainWindow(QMainWindow):
         self.restore_group_settings_3()
         self.update_delay(delay)
         self.update_reverse(mode)
+        if mouse:
+            if not self.is_admin():
+                self.elevate_pyautoactions()
+                os._exit(0)
 
     def eventFilter(self, source, event):
         if source is self.list_widget.viewport() and event.type() == QEvent.Type.MouseButtonPress:
@@ -782,6 +787,9 @@ class MainWindow(QMainWindow):
         if self.mouse_block_action.isChecked():
             self.settings.setValue("mouse_block", True)
             self.monitor.mouse_flag = True
+            if not self.is_admin():
+                self.elevate_pyautoactions()
+                self.exit_grace()
         else:
             self.settings.setValue("mouse_block", False)
             self.monitor.mouse_flag = False
@@ -1231,6 +1239,28 @@ class MainWindow(QMainWindow):
             self.exception_msg = f"create_actions: {e}"
             self.warning_signal.emit()
 
+    # noinspection PyMethodMayBeStatic
+    def is_admin(self):
+        # noinspection PyBroadException
+        try:
+            return SHELL_32.IsUserAnAdmin()
+        except:
+            return False
+
+    # noinspection PyMethodMayBeStatic
+    def elevate_pyautoactions(self):
+        exe = fr"{os.getcwd()}\pyautoactions.exe"
+        with open("elevate.vbs", "w") as vbs_file:
+            vbs_file.write('CreateObject("Shell.Application").ShellExecute "' + exe + '", "", "", "runas", 1')
+        # noinspection SpellCheckingInspection
+        proc = subprocess.Popen(['cscript', '//nologo', 'elevate.vbs'], creationflags=subprocess.CREATE_NO_WINDOW)
+        proc.wait()
+        # noinspection PyBroadException
+        try:
+            os.remove("elevate.vbs")
+        except:
+            pass
+
     def run_as_admin(self, executable_path, command_exists):
         shell32_dll = ctypes.WinDLL("shell32.dll")
         shell_execute_w = shell32_dll.ShellExecuteW
@@ -1426,15 +1456,18 @@ class MainWindow(QMainWindow):
         elif reason == QSystemTrayIcon.ActivationReason.Context:
             self.menu.show()
 
+    def exit_grace(self):
+        self.display_change_flag = False
+        self.display_change_thread.wait()
+        self.monitor.shutting_down = True
+        self.tray_icon.setToolTip("Shutting Down")
+        self.window().hide()
+        self.monitor_thread.wait()
+        QCoreApplication.quit()
+
     def close_tray_icon(self):
         if self.exit_confirm_box("Do you want to exit PyAutoActions?") == QMessageBox.StandardButton.Yes:
-            self.display_change_flag = False
-            self.display_change_thread.wait()
-            self.monitor.shutting_down = True
-            self.tray_icon.setToolTip("Shutting Down")
-            self.window().hide()
-            self.monitor_thread.wait()
-            QCoreApplication.quit()
+            self.exit_grace()
 
     def show_window(self):
         self.center_window()
