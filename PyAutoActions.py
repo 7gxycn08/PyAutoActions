@@ -65,6 +65,8 @@ class ProcessMonitor(QWidget):
         self.primary_monitor = None
         self.found_process = False
         self.main_process = None
+        self.start_script = None
+        self.stop_script = None
         # noinspection SpellCheckingInspection
         self.noti_state = None
         self.is_refresh = is_refresh
@@ -76,6 +78,7 @@ class ProcessMonitor(QWidget):
         self.finished.connect(self.on_finished_show_msg, Qt.ConnectionType.QueuedConnection)
         self.process_thread = QThread()
         self.mouse_block_thread = QThread()
+        self.script_thread = QThread()
         self.process_list = process_list
 
         self.hdr_switch = ctypes.CDLL(r"Dependency\HDRSwitch.dll")
@@ -206,6 +209,10 @@ class ProcessMonitor(QWidget):
 
             if self.primary_monitor:
                 self.SetPrimaryHDRState(enable)
+                if self.check_start_script() is True and enable is True:
+                    start_path = self.get_start_script_from_json()
+                    self.script_thread.run = lambda: self.run_script(start_path)
+                    self.script_thread.start()
                 if self.bluetooth_flag is True and enable is True:
                     asyncio.run(self.bluetooth_on())
                 if self.bluetooth_flag is True and enable is False:
@@ -216,9 +223,17 @@ class ProcessMonitor(QWidget):
                 if self.mouse_flag is True and enable is False:
                     MouseBlock.mouse_brake_flag = True
                     self.mouse_block_thread.wait()
+                if self.check_stop_script() is True and enable is False:
+                    stop_path = self.get_stop_script_from_json()
+                    self.script_thread.run = lambda: self.run_script(stop_path)
+                    self.script_thread.start()
 
             else:
                 self.SetGlobalHDRState(enable)
+                if self.check_start_script() is True and enable is True:
+                    start_path = self.get_start_script_from_json()
+                    self.script_thread.run = lambda: self.run_script(start_path)
+                    self.script_thread.start()
                 if self.bluetooth_flag is True and enable is True:
                     asyncio.run(self.bluetooth_on())
                 if self.bluetooth_flag is True and enable is False:
@@ -229,20 +244,80 @@ class ProcessMonitor(QWidget):
                 if self.mouse_flag is True and enable is False:
                     MouseBlock.mouse_brake_flag = True
                     self.mouse_block_thread.wait()
+                if self.check_stop_script() is True and enable is False:
+                    stop_path = self.get_stop_script_from_json()
+                    self.script_thread.run = lambda: self.run_script(stop_path)
+                    self.script_thread.start()
 
         except Exception as e:
             self.exception_msg = f"toggle_hdr: {e}"
             self.finished.emit()
 
+    # noinspection PyMethodMayBeStatic
+    def run_script(self, path):
+        # noinspection PyBroadException
+        try:
+            subprocess.Popen(path, creationflags=subprocess.CREATE_NO_WINDOW)
+        except:
+            pass
+
+    def check_start_script(self):
+        # noinspection PyBroadException
+        try:
+            json_path = self.get_appdata_path("start_script_paths_data.json")
+            with open(json_path) as f:
+                data = json.load(f)
+            json_text = json.dumps(data)
+            if self.main_process in json_text:
+                return True
+            else:
+                return False
+        except:
+            return False
+
+    def check_stop_script(self):
+        # noinspection PyBroadException
+        try:
+            json_path = self.get_appdata_path("stop_script_paths_data.json")
+            with open(json_path) as f:
+                data = json.load(f)
+            json_text = json.dumps(data)
+            if self.main_process in json_text:
+                return True
+            else:
+                return False
+        except:
+            return False
+
     def check_json_data(self):
-        json_path = self.get_appdata_path("refresh_rate_data.json")
+        # noinspection PyBroadException
+        try:
+            json_path = self.get_appdata_path("refresh_rate_data.json")
+            with open(json_path) as f:
+                data = json.load(f)
+            json_text = json.dumps(data)
+            if self.main_process in json_text:
+                return True
+            else:
+                return False
+        except:
+            return False
+
+    def get_start_script_from_json(self):
+        json_path = self.get_appdata_path("start_script_paths_data.json")
         with open(json_path) as f:
             data = json.load(f)
-        json_text = json.dumps(data)
-        if self.main_process in json_text:
-            return True
-        else:
-            return False
+
+        script_path = data[self.main_process]
+        return script_path
+
+    def get_stop_script_from_json(self):
+        json_path = self.get_appdata_path("stop_script_paths_data.json")
+        with open(json_path) as f:
+            data = json.load(f)
+
+        script_path = data[self.main_process]
+        return script_path
 
     def get_refresh_from_json(self):
         json_path = self.get_appdata_path("refresh_rate_data.json")
@@ -952,6 +1027,9 @@ class MainWindow(QMainWindow):
         suspend_action = menu.addAction("Suspend Process")
         resume_action = menu.addAction("Resume Process")
         menu.addSeparator()
+        start_script_action = menu.addAction("Pre-Start")
+        stop_script_action = menu.addAction("Post-Stop")
+        menu.addSeparator()
         end_action = menu.addAction("End Task")
 
         action = menu.exec(self.list_widget.mapToGlobal(pos))
@@ -967,11 +1045,57 @@ class MainWindow(QMainWindow):
             self.resume_entry()
         elif action == end_action:
             self.exit_task()
+        elif action == start_script_action:
+            self.script_entry("start")
+        elif action == stop_script_action:
+            self.script_entry("stop")
 
     # noinspection SpellCheckingInspection
     def exit_task(self):
         exe_name = os.path.basename(self.current_file_path)
         subprocess.Popen(["taskkill", "/f", "/im", f"{exe_name}"], creationflags=subprocess.CREATE_NO_WINDOW)
+
+    def script_entry(self, reason):
+        if reason == "start":
+            last_item = self.list_widget.currentItem()
+            selected_text = os.path.basename(last_item.text())
+            current_script = self.get_start_script(selected_text)
+            if current_script is not None:
+                preloaded_msg = "Currently set script to be executed at start: " + current_script
+                self.information_signal.emit(preloaded_msg)
+            script_args = QInputDialog(self)
+            script_args.setWindowTitle("PyAutoActions")
+            script_args.setLabelText("Enter Script/Program Absolute Path:")
+            script_args.setWindowIcon(QIcon(r"Resources\main.ico"))
+            script_args.setFixedSize(400, 200)
+            script_args.textValueSelected.connect(self.save_start_script_info)
+            winsound.MessageBeep()
+            screen = app.primaryScreen()
+            screen_geometry = screen.availableGeometry()
+            x = (screen_geometry.width() - script_args.width()) // 2
+            y = (screen_geometry.height() - script_args.height()) // 2
+            script_args.move(x, y)
+            script_args.show()  # Non-blocking
+        else:
+            last_item = self.list_widget.currentItem()
+            selected_text = os.path.basename(last_item.text())
+            current_script = self.get_stop_script(selected_text)
+            if current_script is not None:
+                preloaded_msg = "Currently set script to be executed at process exit: " + current_script
+                self.information_signal.emit(preloaded_msg)
+            script_args = QInputDialog(self)
+            script_args.setWindowTitle("PyAutoActions")
+            script_args.setLabelText("Enter Script/Program Absolute Path:")
+            script_args.setWindowIcon(QIcon(r"Resources\main.ico"))
+            script_args.setFixedSize(400, 200)
+            script_args.textValueSelected.connect(self.save_stop_script_info)
+            winsound.MessageBeep()
+            screen = app.primaryScreen()
+            screen_geometry = screen.availableGeometry()
+            x = (screen_geometry.width() - script_args.width()) // 2
+            y = (screen_geometry.height() - script_args.height()) // 2
+            script_args.move(x, y)
+            script_args.show()  # Non-blocking
 
     def suspend_entry(self):
         exe_name = os.path.basename(self.current_file_path)
@@ -1108,6 +1232,56 @@ class MainWindow(QMainWindow):
         information_message_box.move(x, y)
         information_message_box.exec()
 
+    def save_start_script_info(self, script_path):
+        if script_path:
+            json_path = self.get_appdata_path("start_script_paths_data.json")
+            file_path = Path(json_path)
+            base_exe = os.path.basename(self.current_file_path)
+            data = {f"{base_exe}": f"{script_path}"}  # new or updated values
+
+            # Step 1: Load existing data if file exists
+            if file_path.exists():
+                with open(file_path, "r") as f:
+                    existing_data = json.load(f)
+            else:
+                existing_data = {}
+
+            # Step 2: Update existing data
+            existing_data.update(data)
+
+            # Step 3: Save back to file
+            with open(file_path, "w") as f:
+                json.dump(existing_data, f, indent=4)
+        else:
+            last_item = self.list_widget.currentItem()
+            selected_text = last_item.text()
+            self.remove_data_entry(os.path.basename(selected_text), "start_script")
+
+    def save_stop_script_info(self, script_path):
+        if script_path:
+            json_path = self.get_appdata_path("stop_script_paths_data.json")
+            file_path = Path(json_path)
+            base_exe = os.path.basename(self.current_file_path)
+            data = {f"{base_exe}": f"{script_path}"}  # new or updated values
+
+            # Step 1: Load existing data if file exists
+            if file_path.exists():
+                with open(file_path, "r") as f:
+                    existing_data = json.load(f)
+            else:
+                existing_data = {}
+
+            # Step 2: Update existing data
+            existing_data.update(data)
+
+            # Step 3: Save back to file
+            with open(file_path, "w") as f:
+                json.dump(existing_data, f, indent=4)
+        else:
+            last_item = self.list_widget.currentItem()
+            selected_text = last_item.text()
+            self.remove_data_entry(os.path.basename(selected_text), "stop_script")
+
     def save_command_args_info(self, command_args):
         if command_args:
             json_path = self.get_appdata_path("command_args_data.json")
@@ -1131,7 +1305,7 @@ class MainWindow(QMainWindow):
         else:
             last_item = self.list_widget.currentItem()
             selected_text = last_item.text()
-            self.remove_data_entry(os.path.basename(selected_text))
+            self.remove_data_entry(os.path.basename(selected_text), "command_args")
 
     def save_refresh_info(self, refresh_rate):
         if refresh_rate.isdigit():
@@ -1156,7 +1330,7 @@ class MainWindow(QMainWindow):
         else:
             last_item = self.list_widget.currentItem()
             selected_text = last_item.text()
-            self.remove_data_entry(os.path.basename(selected_text))
+            self.remove_data_entry(os.path.basename(selected_text), "refresh_rate")
 
     # noinspection PyMethodMayBeStatic
     def get_icon_as_image_object(self, file_path, num=0):
@@ -1373,6 +1547,34 @@ class MainWindow(QMainWindow):
             self.warning_signal.emit()
             return None
 
+    def get_start_script(self, exe_name):
+        json_path = Path(self.get_appdata_path("start_script_paths_data.json"))
+        if not json_path.exists():
+            return None
+        try:
+            with json_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data.get(exe_name)
+
+        except Exception as e:
+            self.exception_msg = f"get_start_script: {e}"
+            self.warning_signal.emit()
+            return None
+
+    def get_stop_script(self, exe_name):
+        json_path = Path(self.get_appdata_path("stop_script_paths_data.json"))
+        if not json_path.exists():
+            return None
+        try:
+            with json_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data.get(exe_name)
+
+        except Exception as e:
+            self.exception_msg = f"get_stop_script: {e}"
+            self.warning_signal.emit()
+            return None
+
     def update_classes_variables(self):
         self.monitor.process_list = self.process_list
 
@@ -1475,11 +1677,28 @@ class MainWindow(QMainWindow):
         self.activateWindow()
 
     # noinspection PyMethodMayBeStatic
-    def remove_data_entry(self, process_key):
-        json_path = self.get_appdata_path("refresh_rate_data.json")
-        self.remove_data(json_path, process_key)
-        json_path = self.get_appdata_path("command_args_data.json")
-        self.remove_data(json_path, process_key)
+    def remove_data_entry(self, process_key, settings):
+        if settings == "refresh_rate":
+            json_path = self.get_appdata_path("refresh_rate_data.json")
+            self.remove_data(json_path, process_key)
+        elif settings == "command_args":
+            json_path = self.get_appdata_path("command_args_data.json")
+            self.remove_data(json_path, process_key)
+        elif settings == "start_script":
+            json_path = self.get_appdata_path("start_script_paths_data.json")
+            self.remove_data(json_path, process_key)
+        elif settings == "stop_script":
+            json_path = self.get_appdata_path("stop_script_paths_data.json")
+            self.remove_data(json_path, process_key)
+        else:
+            json_path = self.get_appdata_path("refresh_rate_data.json")
+            self.remove_data(json_path, process_key)
+            json_path = self.get_appdata_path("command_args_data.json")
+            self.remove_data(json_path, process_key)
+            json_path = self.get_appdata_path("start_script_paths_data.json")
+            self.remove_data(json_path, process_key)
+            json_path = self.get_appdata_path("stop_script_paths_data.json")
+            self.remove_data(json_path, process_key)
 
     # noinspection PyMethodMayBeStatic
     def remove_data(self, json_path, process_key):
@@ -1507,8 +1726,7 @@ class MainWindow(QMainWindow):
                 self.list_widget.takeItem(self.list_widget.row(selected_item))
                 self.create_actions()
                 self.update_classes_variables()
-                self.remove_data_entry(selected_text)
-
+                self.remove_data_entry(selected_text,"all")
             else:
                 self.exception_msg = "Nothing to remove."
                 self.warning_signal.emit()
